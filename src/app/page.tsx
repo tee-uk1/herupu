@@ -14,6 +14,9 @@ export default async function Home() {
               orderBy: { order: "asc" },
               include: {
                 tags: true,
+                subtasks: {
+                  orderBy: { createdAt: "asc" },
+                },
               },
             },
           },

@@ -1,8 +1,8 @@
 "use client"
 
 import React from "react"
-import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, Plus } from "lucide-react"
-import { TaskItem, TagItem } from "./kanban-card"
+import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, CheckSquare } from "lucide-react"
+import { TaskItem } from "./kanban-card"
 import { ColumnItem } from "./kanban-board"
 import { InlineTaskCreator } from "./inline-task-creator"
 
@@ -43,7 +43,6 @@ export function TaskListView({
     <div className="flex flex-col gap-6 w-full max-w-5xl">
       {columns.map((column) => (
         <div key={column.id} className="flex flex-col bg-zinc-900/40 border border-zinc-800/80 rounded-lg overflow-hidden">
-          {/* Group Header */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-zinc-200 tracking-wide uppercase">
@@ -55,18 +54,19 @@ export function TaskListView({
             </div>
           </div>
 
-          {/* Table Header */}
           <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[11px] font-medium text-zinc-500 border-b border-zinc-800/60 bg-zinc-950/30">
-            <div className="col-span-6">Name</div>
-            <div className="col-span-3">Tags</div>
+            <div className="col-span-5">Name</div>
+            <div className="col-span-2 text-center">Subtasks</div>
+            <div className="col-span-2">Tags</div>
             <div className="col-span-1 text-center">Priority</div>
             <div className="col-span-2 text-right">Due Date</div>
           </div>
 
-          {/* Task Rows */}
           <div className="divide-y divide-zinc-800/50">
             {column.tasks.map((task) => {
               const due = formatDueDate(task.dueDate)
+              const totalSubs = task.subtasks?.length ?? 0
+              const completedSubs = task.subtasks?.filter((s) => s.isCompleted).length ?? 0
 
               return (
                 <div
@@ -74,8 +74,7 @@ export function TaskListView({
                   onClick={() => onTaskClick(task)}
                   className="grid grid-cols-12 gap-2 items-center px-4 py-2.5 hover:bg-zinc-800/40 cursor-pointer transition-colors text-xs group"
                 >
-                  {/* Name & ID */}
-                  <div className="col-span-6 flex items-center gap-2 overflow-hidden">
+                  <div className="col-span-5 flex items-center gap-2 overflow-hidden">
                     <span className="text-[10px] font-mono text-zinc-500 shrink-0">
                       HERUPU-{task.id.slice(-4)}
                     </span>
@@ -84,8 +83,23 @@ export function TaskListView({
                     </span>
                   </div>
 
-                  {/* Tags */}
-                  <div className="col-span-3 flex flex-wrap gap-1 overflow-hidden">
+                  {/* Subtask Counter */}
+                  <div className="col-span-2 flex items-center justify-center">
+                    {totalSubs > 0 ? (
+                      <span className={`inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                        completedSubs === totalSubs
+                          ? "bg-emerald-950/40 text-emerald-400 border border-emerald-900/60"
+                          : "text-zinc-400 bg-zinc-800/60"
+                      }`}>
+                        <CheckSquare className="w-3 h-3" />
+                        {completedSubs}/{totalSubs}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-600 text-[11px]">—</span>
+                    )}
+                  </div>
+
+                  <div className="col-span-2 flex flex-wrap gap-1 overflow-hidden">
                     {task.tags && task.tags.length > 0 ? (
                       task.tags.map((tag) => (
                         <span
@@ -101,14 +115,12 @@ export function TaskListView({
                     )}
                   </div>
 
-                  {/* Priority */}
                   <div className="col-span-1 flex items-center justify-center">
                     <span title={task.priority}>
                       {priorityIcons[task.priority]}
                     </span>
                   </div>
 
-                  {/* Due Date */}
                   <div className="col-span-2 flex justify-end">
                     {due ? (
                       <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-mono ${due.className}`}>
@@ -130,7 +142,6 @@ export function TaskListView({
             )}
           </div>
 
-          {/* Quick-add in List Row */}
           <div className="p-2 border-t border-zinc-800/40 bg-zinc-950/20">
             <InlineTaskCreator columnId={column.id} />
           </div>

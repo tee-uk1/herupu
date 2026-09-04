@@ -9,105 +9,111 @@ export async function updateTaskPosition(
   newColumnId: string,
   newOrder: number
 ) {
-  try {
-    await prisma.task.update({
-      where: { id: taskId },
-      data: {
-        columnId: newColumnId,
-        order: newOrder,
-      },
-    })
-    revalidatePath("/")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to update task position:", error)
-    return { success: false, error }
-  }
+  await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      columnId: newColumnId,
+      order: newOrder,
+    },
+  })
+  revalidatePath("/")
 }
 
-export async function createTask(formData: {
+export async function createTask(data: {
   title: string
   description?: string
-  priority: Priority
+  priority?: Priority
   columnId: string
-  dueDate?: string
+  dueDate?: string | null
   tagIds?: string[]
 }) {
-  try {
-    const highestTask = await prisma.task.findFirst({
-      where: { columnId: formData.columnId },
-      orderBy: { order: "desc" },
-    })
+  const count = await prisma.task.count({
+    where: { columnId: data.columnId },
+  })
 
-    const nextOrder = highestTask ? highestTask.order + 1 : 0
+  const task = await prisma.task.create({
+    data: {
+      title: data.title,
+      description: data.description,
+      priority: data.priority ?? "MEDIUM",
+      columnId: data.columnId,
+      order: count,
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      tags: data.tagIds && data.tagIds.length > 0
+        ? { connect: data.tagIds.map((id) => ({ id })) }
+        : undefined,
+    },
+  })
 
-    await prisma.task.create({
-      data: {
-        title: formData.title,
-        description: formData.description || null,
-        priority: formData.priority,
-        columnId: formData.columnId,
-        order: nextOrder,
-        dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
-        tags: formData.tagIds && formData.tagIds.length > 0
-          ? { connect: formData.tagIds.map((id) => ({ id })) }
-          : undefined,
-      },
-    })
-
-    revalidatePath("/")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to create task:", error)
-    return { success: false, error }
-  }
+  revalidatePath("/")
+  return task
 }
 
 export async function updateTaskDetails(
   taskId: string,
   data: {
     title?: string
-    description?: string | null
+    description?: string
     priority?: Priority
     columnId?: string
     dueDate?: string | null
     tagIds?: string[]
   }
 ) {
-  try {
-    await prisma.task.update({
-      where: { id: taskId },
-      data: {
-        title: data.title,
-        description: data.description,
-        priority: data.priority,
-        columnId: data.columnId,
-        dueDate: data.dueDate !== undefined ? (data.dueDate ? new Date(data.dueDate) : null) : undefined,
-        tags: data.tagIds
-          ? {
-              set: data.tagIds.map((id) => ({ id })),
-            }
-          : undefined,
-      },
-    })
+  const updatePayload: any = {}
 
-    revalidatePath("/")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to update task details:", error)
-    return { success: false, error }
+  if (data.title !== undefined) updatePayload.title = data.title
+  if (data.description !== undefined) updatePayload.description = data.description
+  if (data.priority !== undefined) updatePayload.priority = data.priority
+  if (data.columnId !== undefined) updatePayload.columnId = data.columnId
+  if (data.dueDate !== undefined) {
+    updatePayload.dueDate = data.dueDate ? new Date(data.dueDate) : null
   }
+  if (data.tagIds !== undefined) {
+    updatePayload.tags = {
+      set: data.tagIds.map((id) => ({ id })),
+    }
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: updatePayload,
+  })
+
+  revalidatePath("/")
+  return updated
 }
 
 export async function deleteTask(taskId: string) {
-  try {
-    await prisma.task.delete({
-      where: { id: taskId },
-    })
-    revalidatePath("/")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to delete task:", error)
-    return { success: false, error }
-  }
+  await prisma.task.delete({
+    where: { id: taskId },
+  })
+  revalidatePath("/")
+}
+
+export async function createSubtask(taskId: string, title: string) {
+  const subtask = await prisma.subtask.create({
+    data: {
+      title,
+      taskId,
+    },
+  })
+  revalidatePath("/")
+  return subtask
+}
+
+export async function toggleSubtask(subtaskId: string, isCompleted: boolean) {
+  const subtask = await prisma.subtask.update({
+    where: { id: subtaskId },
+    data: { isCompleted },
+  })
+  revalidatePath("/")
+  return subtask
+}
+
+export async function deleteSubtask(subtaskId: string) {
+  await prisma.subtask.delete({
+    where: { id: subtaskId },
+  })
+  revalidatePath("/")
 }
