@@ -18,6 +18,9 @@ export default async function Home() {
                 subtasks: {
                   orderBy: { createdAt: "asc" },
                 },
+                comments: {
+                  orderBy: { createdAt: "asc" },
+                },
               },
             },
           },

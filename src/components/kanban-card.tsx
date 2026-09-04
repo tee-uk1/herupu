@@ -3,7 +3,7 @@
 import React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, CheckSquare } from "lucide-react"
+import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, CheckSquare, MessageSquare } from "lucide-react"
 
 export type TagItem = {
   id: string
@@ -17,6 +17,13 @@ export type SubtaskItem = {
   isCompleted: boolean
 }
 
+export type CommentItem = {
+  id: string
+  content: string
+  author: string
+  createdAt: string | Date
+}
+
 export type TaskItem = {
   id: string
   title: string
@@ -27,6 +34,7 @@ export type TaskItem = {
   dueDate?: string | Date | null
   tags?: TagItem[]
   subtasks?: SubtaskItem[]
+  comments?: CommentItem[]
 }
 
 const priorityConfig = {
@@ -88,6 +96,7 @@ export function KanbanCard({
   const totalSubtasks = task.subtasks?.length ?? 0
   const completedSubtasks = task.subtasks?.filter((s) => s.isCompleted).length ?? 0
   const progressPercent = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0
+  const commentCount = task.comments?.length ?? 0
 
   return (
     <div
@@ -113,7 +122,6 @@ export function KanbanCard({
         </p>
       )}
 
-      {/* Subtask Progress Bar */}
       {totalSubtasks > 0 && (
         <div className="flex flex-col gap-1 pt-0.5">
           <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono">
@@ -134,9 +142,8 @@ export function KanbanCard({
         </div>
       )}
 
-      {/* Tags & Due Date Footer */}
       <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 mt-auto border-t border-zinc-700/40">
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           {task.tags?.map((tag) => (
             <span
               key={tag.id}
@@ -146,6 +153,13 @@ export function KanbanCard({
               {tag.name}
             </span>
           ))}
+
+          {commentCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400">
+              <MessageSquare className="w-3 h-3" />
+              {commentCount}
+            </span>
+          )}
         </div>
 
         {dueDateInfo && (

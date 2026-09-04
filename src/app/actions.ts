@@ -176,6 +176,45 @@ export async function deleteSubtask(subtaskId: string) {
   revalidatePath("/")
 }
 
+export async function createComment(taskId: string, content: string, author: string = "tee-uk1") {
+  const comment = await prisma.comment.create({
+    data: {
+      content,
+      author,
+      taskId,
+    },
+    include: { task: true },
+  })
+
+  await recordActivity(
+    "COMMENT_ADDED",
+    `Added a comment to "${comment.task.title}"`
+  )
+
+  revalidatePath("/")
+  return comment
+}
+
+export async function deleteComment(commentId: string) {
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    include: { task: true },
+  })
+
+  await prisma.comment.delete({
+    where: { id: commentId },
+  })
+
+  if (comment) {
+    await recordActivity(
+      "COMMENT_DELETED",
+      `Removed a comment from "${comment.task.title}"`
+    )
+  }
+
+  revalidatePath("/")
+}
+
 export async function createColumn(name: string) {
   const project = await prisma.project.findFirst()
   if (!project) return

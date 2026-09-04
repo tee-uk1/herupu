@@ -1,9 +1,21 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { X, Trash2, Calendar, Tag as TagIcon, CheckSquare, Plus, Loader2 } from "lucide-react"
-import { TaskItem, TagItem, SubtaskItem } from "./kanban-card"
-import { updateTaskDetails, deleteTask, createSubtask, toggleSubtask, deleteSubtask } from "@/app/actions"
+import { X, Trash2, Calendar, Tag as TagIcon, CheckSquare, Plus, Loader2, MessageSquare, Send } from "lucide-react"
+import { TaskItem, TagItem, SubtaskItem, CommentItem } from "./kanban-card"
+import { updateTaskDetails, deleteTask, createSubtask, toggleSubtask, deleteSubtask, createComment, deleteComment } from "@/app/actions"
+
+function formatRelativeTime(dateInput: string | Date) {
+  const date = new Date(dateInput)
+  const diffInSec = Math.floor((Date.now() - date.getTime()) / 1000)
+
+  if (diffInSec < 60) return "just now"
+  const diffInMin = Math.floor(diffInSec / 60)
+  if (diffInMin < 60) return `${diffInMin}m ago`
+  const diffInHours = Math.floor(diffInMin / 60)
+  if (diffInHours < 24) return `${diffInHours}h ago`
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
 
 export function TaskDetailDrawer({
   task,
@@ -27,6 +39,12 @@ export function TaskDetailDrawer({
   const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
   const [isAddingSubtask, setIsAddingSubtask] = useState(false)
+
+  // Comments local state
+  const [comments, setComments] = useState<CommentItem[]>([])
+  const [newCommentContent, setNewCommentContent] = useState("")
+  const [isPostingComment, setIsPostingComment] = useState(false)
+
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -40,6 +58,7 @@ export function TaskDetailDrawer({
       )
       setSelectedTagIds(task.tags ? task.tags.map((t) => t.id) : [])
       setSubtasks(task.subtasks || [])
+      setComments(task.comments || [])
     }
   }, [task])
 
@@ -96,6 +115,23 @@ export function TaskDetailDrawer({
     await deleteSubtask(subtaskId)
   }
 
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = newCommentContent.trim()
+    if (!trimmed || isPostingComment) return
+
+    setIsPostingComment(true)
+    const created = await createComment(task.id, trimmed, "tee-uk1")
+    setComments((prev) => [...prev, created])
+    setNewCommentContent("")
+    setIsPostingComment(false)
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    setComments((prev) => prev.filter((c) => c.id !== commentId))
+    await deleteComment(commentId)
+  }
+
   const completedCount = subtasks.filter((s) => s.isCompleted).length
 
   return (
@@ -141,7 +177,7 @@ export function TaskDetailDrawer({
             />
           </div>
 
-          {/* Status & Priority Row */}
+          {/* Status & Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">Status</label>
@@ -221,7 +257,7 @@ export function TaskDetailDrawer({
             </div>
           </div>
 
-          {/* Subtasks / Checklist Section */}
+          {/* Checklist */}
           <div className="flex flex-col gap-3 pt-2 border-t border-zinc-800">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
@@ -235,7 +271,6 @@ export function TaskDetailDrawer({
               )}
             </div>
 
-            {/* Subtask list */}
             <div className="flex flex-col gap-1.5">
               {subtasks.map((subtask) => (
                 <div
@@ -247,7 +282,7 @@ export function TaskDetailDrawer({
                       type="checkbox"
                       checked={subtask.isCompleted}
                       onChange={() => handleToggleSubtask(subtask.id, subtask.isCompleted)}
-                      className="w-3.5 h-3.5 rounded bg-zinc-900 border-zinc-700 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      className="w-3.5 h-3.5 rounded bg-zinc-900 border-zinc-700 text-blue-600 focus:ring-0 cursor-pointer"
                     />
                     <span
                       className={`text-xs truncate transition-all ${
@@ -269,7 +304,6 @@ export function TaskDetailDrawer({
               ))}
             </div>
 
-            {/* Quick add subtask form */}
             <form onSubmit={handleAddSubtask} className="flex items-center gap-2 mt-1">
               <input
                 type="text"
@@ -294,12 +328,98 @@ export function TaskDetailDrawer({
           <div className="pt-2 border-t border-zinc-800">
             <label className="block text-xs font-medium text-zinc-400 mb-1">Description</label>
             <textarea
-              rows={4}
+              rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add detailed task notes or acceptance criteria..."
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+              placeholder="Add task notes or acceptance criteria..."
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-blue-500 transition-colors resize-none"
             />
+          </div>
+
+          {/* Activity Comments Discussion Section */}
+          <div className="flex flex-col gap-3 pt-4 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+                <span>Discussion & Comments</span>
+              </label>
+              <span className="text-[11px] font-mono text-zinc-500">
+                {comments.length}
+              </span>
+            </div>
+
+            {/* Comment Thread */}
+            <div className="flex flex-col gap-3">
+              {comments.map((comment) => (
+                <div
+                  key={comment.id}
+                  className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-950/70 border border-zinc-800/80 group"
+                >
+                  <div className="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center text-[10px] font-semibold shrink-0">
+                    {comment.author.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-zinc-300">
+                        {comment.author}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          {formatRelativeTime(comment.createdAt)}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-all p-0.5"
+                          title="Delete Comment"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-200 mt-1 whitespace-pre-wrap leading-relaxed">
+                      {comment.content}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {comments.length === 0 && (
+                <div className="py-4 text-center text-xs text-zinc-500 italic">
+                  No comments yet. Start the conversation below.
+                </div>
+              )}
+            </div>
+
+            {/* Add Comment Input Form */}
+            <form onSubmit={handleAddComment} className="flex flex-col gap-2 mt-2">
+              <textarea
+                rows={2}
+                value={newCommentContent}
+                disabled={isPostingComment}
+                onChange={(e) => setNewCommentContent(e.target.value)}
+                placeholder="Write a comment... (Enter to post, Shift+Enter for newline)"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleAddComment(e)
+                  }
+                }}
+                className="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 rounded-lg p-2.5 text-xs text-zinc-100 placeholder-zinc-500 outline-none transition-all resize-none"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  Press ↵ Enter to comment
+                </span>
+                <button
+                  type="submit"
+                  disabled={!newCommentContent.trim() || isPostingComment}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  {isPostingComment ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                  Comment
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
