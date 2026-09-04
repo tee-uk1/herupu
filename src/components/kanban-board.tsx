@@ -22,6 +22,7 @@ import {
 } from "@dnd-kit/sortable"
 import { KanbanCard, TaskItem, TagItem } from "./kanban-card"
 import { TaskDetailDrawer } from "./task-detail-drawer"
+import { InlineTaskCreator } from "./inline-task-creator"
 import { updateTaskPosition } from "@/app/actions"
 
 export type ColumnItem = {
@@ -45,19 +46,23 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`w-72 shrink-0 bg-zinc-900/70 border rounded-lg p-3 flex flex-col gap-3 transition-colors ${
+      className={`w-72 shrink-0 bg-zinc-900/70 border rounded-lg p-3 flex flex-col justify-between transition-colors ${
         isOver ? "border-blue-500/50 bg-zinc-900" : "border-zinc-800/80"
       }`}
     >
-      <div className="flex items-center justify-between px-1">
-        <span className="text-sm font-semibold text-zinc-200">
-          {column.name}
-        </span>
-        <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono">
-          {column.tasks.length}
-        </span>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-sm font-semibold text-zinc-200">
+            {column.name}
+          </span>
+          <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono">
+            {column.tasks.length}
+          </span>
+        </div>
+        {children}
       </div>
-      {children}
+
+      <InlineTaskCreator columnId={column.id} />
     </div>
   )
 }
@@ -209,7 +214,7 @@ export function KanbanBoard({
         {initialColumns.map((col) => (
           <div
             key={col.id}
-            className="w-72 shrink-0 bg-zinc-900/70 border border-zinc-800/80 rounded-lg p-3 flex flex-col gap-3"
+            className="w-72 shrink-0 bg-zinc-900/70 border border-zinc-800/80 rounded-lg p-3 flex flex-col justify-between"
           >
             <div className="flex items-center justify-between px-1">
               <span className="text-sm font-semibold text-zinc-200">{col.name}</span>
@@ -258,7 +263,7 @@ export function KanbanBoard({
                       />
                     ))}
                     {column.tasks.length === 0 && (
-                      <div className="h-28 flex items-center justify-center border border-dashed border-zinc-800/80 rounded text-xs text-zinc-500 select-none">
+                      <div className="h-24 flex items-center justify-center border border-dashed border-zinc-800/80 rounded text-xs text-zinc-500 select-none">
                         Drop here
                       </div>
                     )}
