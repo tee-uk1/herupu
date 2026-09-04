@@ -117,3 +117,39 @@ export async function deleteSubtask(subtaskId: string) {
   })
   revalidatePath("/")
 }
+
+export async function createColumn(name: string) {
+  const project = await prisma.project.findFirst()
+  if (!project) return
+
+  const count = await prisma.column.count({
+    where: { projectId: project.id },
+  })
+
+  const newColumn = await prisma.column.create({
+    data: {
+      name,
+      order: count,
+      projectId: project.id,
+    },
+  })
+
+  revalidatePath("/")
+  return newColumn
+}
+
+export async function updateColumnName(columnId: string, name: string) {
+  const updated = await prisma.column.update({
+    where: { id: columnId },
+    data: { name },
+  })
+  revalidatePath("/")
+  return updated
+}
+
+export async function deleteColumn(columnId: string) {
+  await prisma.column.delete({
+    where: { id: columnId },
+  })
+  revalidatePath("/")
+}

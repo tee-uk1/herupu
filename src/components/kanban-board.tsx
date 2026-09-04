@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import {
   DndContext,
   DragOverlay,
@@ -20,10 +20,11 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
+import { MoreHorizontal, Plus, Trash2, Edit2, Check, X, Loader2 } from "lucide-react"
 import { KanbanCard, TaskItem, TagItem } from "./kanban-card"
 import { TaskDetailDrawer } from "./task-detail-drawer"
 import { InlineTaskCreator } from "./inline-task-creator"
-import { updateTaskPosition } from "@/app/actions"
+import { updateTaskPosition, createColumn, updateColumnName, deleteColumn } from "@/app/actions"
 
 export type ColumnItem = {
   id: string
@@ -43,6 +44,41 @@ function DroppableColumn({
     id: column.id,
   })
 
+  const [isEditing, setIsEditing] = useState(false)
+  const [name, setName] = useState(column.name)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const handleSaveName = async () => {
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === column.name) {
+      setName(column.name)
+      setIsEditing(false)
+      return
+    }
+    await updateColumnName(column.id, trimmed)
+    setIsEditing(false)
+  }
+
+  const handleDelete = async () => {
+    const msg = column.tasks.length > 0
+      ? `Deleting "${column.name}" will also delete its ${column.tasks.length} task(s). Continue?`
+      : `Delete column "${column.name}"?`
+    if (confirm(msg)) {
+      await deleteColumn(column.id)
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -51,14 +87,90 @@ function DroppableColumn({
       }`}
     >
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-sm font-semibold text-zinc-200">
-            {column.name}
-          </span>
-          <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono">
-            {column.tasks.length}
-          </span>
+        {/* Column Header */}
+        <div className="flex items-center justify-between px-1 relative">
+          {isEditing ? (
+            <div className="flex items-center gap-1.5 flex-1 mr-2">
+              <input
+                type="text"
+                value={name}
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveName()
+                  if (e.key === "Escape") {
+                    setName(column.name)
+                    setIsEditing(false)
+                  }
+                }}
+                className="bg-zinc-950 border border-zinc-700 text-xs px-2 py-1 rounded text-zinc-100 outline-none w-full"
+              />
+              <button
+                onClick={handleSaveName}
+                className="p-1 hover:text-emerald-400 text-zinc-400"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => {
+                  setName(column.name)
+                  setIsEditing(false)
+                }}
+                className="p-1 hover:text-zinc-200 text-zinc-500"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 cursor-pointer group flex-1 mr-2 overflow-hidden"
+            >
+              <span className="text-sm font-semibold text-zinc-200 truncate group-hover:text-blue-400 transition-colors">
+                {column.name}
+              </span>
+              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono shrink-0">
+                {column.tasks.length}
+              </span>
+            </div>
+          )}
+
+          {/* Action Menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="p-1 text-zinc-500 hover:text-zinc-300 rounded hover:bg-zinc-800 transition-colors"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-6 w-32 bg-zinc-900 border border-zinc-800 rounded-md shadow-xl py-1 z-30 text-xs flex flex-col">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setIsEditing(true)
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 text-left"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                  Rename
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    handleDelete()
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-red-400 hover:bg-red-950/30 text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
         {children}
       </div>
 
@@ -78,6 +190,11 @@ export function KanbanBoard({
   const [activeTask, setActiveTask] = useState<TaskItem | null>(null)
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
   const [mounted, setMounted] = useState(false)
+
+  // Add Column State
+  const [isAddingCol, setIsAddingCol] = useState(false)
+  const [newColName, setNewColName] = useState("")
+  const [isSubmittingCol, setIsSubmittingCol] = useState(false)
 
   useEffect(() => {
     setColumns(initialColumns)
@@ -208,6 +325,18 @@ export function KanbanBoard({
     [findColumn]
   )
 
+  const handleCreateColumn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = newColName.trim()
+    if (!trimmed || isSubmittingCol) return
+
+    setIsSubmittingCol(true)
+    await createColumn(trimmed)
+    setNewColName("")
+    setIsSubmittingCol(false)
+    setIsAddingCol(false)
+  }
+
   if (!mounted) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4 items-start">
@@ -221,11 +350,6 @@ export function KanbanBoard({
               <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono">
                 {col.tasks.length}
               </span>
-            </div>
-            <div className="flex flex-col gap-2 min-h-[160px] p-1">
-              {col.tasks.map((task) => (
-                <KanbanCard key={task.id} task={task} />
-              ))}
             </div>
           </div>
         ))}
@@ -243,7 +367,7 @@ export function KanbanBoard({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+        <div className="flex gap-4 overflow-x-auto pb-6 items-start">
           {columns.map((column) => {
             const taskIds = column.tasks.map((t) => t.id)
 
@@ -272,6 +396,54 @@ export function KanbanBoard({
               </DroppableColumn>
             )
           })}
+
+          {/* Add Column Button / Form */}
+          <div className="w-72 shrink-0">
+            {isAddingCol ? (
+              <form
+                onSubmit={handleCreateColumn}
+                className="bg-zinc-900/90 border border-zinc-800 p-3 rounded-lg flex flex-col gap-2 shadow-lg"
+              >
+                <input
+                  type="text"
+                  autoFocus
+                  disabled={isSubmittingCol}
+                  value={newColName}
+                  onChange={(e) => setNewColName(e.target.value)}
+                  placeholder="Column name (e.g. Review)..."
+                  className="w-full bg-zinc-950 border border-zinc-700 text-xs px-2.5 py-1.5 rounded text-zinc-100 outline-none focus:border-blue-500"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={!newColName.trim() || isSubmittingCol}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
+                  >
+                    {isSubmittingCol && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Add Column
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingCol(false)
+                      setNewColName("")
+                    }}
+                    className="p-1 text-zinc-400 hover:text-zinc-200"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setIsAddingCol(true)}
+                className="w-full h-11 flex items-center justify-center gap-1.5 border border-dashed border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Column</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <DragOverlay>
