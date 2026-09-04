@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"
-import { LayoutGrid, List, Command, History } from "lucide-react"
+import { LayoutGrid, List, Command, History, Shield, ShieldAlert } from "lucide-react"
 import { KanbanBoard, ColumnItem } from "./kanban-board"
 import { TaskListView } from "./task-list-view"
 import { TaskDetailDrawer } from "./task-detail-drawer"
@@ -23,6 +23,7 @@ export function WorkspaceView({
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(true) // Defaults to Admin for your account
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     priorities: [],
@@ -79,29 +80,46 @@ export function WorkspaceView({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800 w-fit">
-          <button
-            onClick={() => setView("board")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              view === "board"
-                ? "bg-zinc-800 text-zinc-100 shadow-xs"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Board</span>
-          </button>
+        <div className="flex items-center gap-2">
+          {/* View Switcher */}
+          <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800 w-fit">
+            <button
+              onClick={() => setView("board")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                view === "board"
+                  ? "bg-zinc-800 text-zinc-100 shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Board</span>
+            </button>
 
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                view === "list"
+                  ? "bg-zinc-800 text-zinc-100 shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>List</span>
+            </button>
+          </div>
+
+          {/* Admin Role Toggle Badge */}
           <button
-            onClick={() => setView("list")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              view === "list"
-                ? "bg-zinc-800 text-zinc-100 shadow-xs"
-                : "text-zinc-400 hover:text-zinc-200"
+            onClick={() => setIsAdmin((prev) => !prev)}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+              isAdmin
+                ? "bg-purple-950/40 border-purple-800/60 text-purple-300 hover:bg-purple-900/40"
+                : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300"
             }`}
+            title="Click to toggle between Admin and Member mode"
           >
-            <List className="w-3.5 h-3.5" />
-            <span>List</span>
+            {isAdmin ? <Shield className="w-3.5 h-3.5 text-purple-400" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+            <span>{isAdmin ? "Admin Mode" : "Member Mode"}</span>
           </button>
         </div>
 
@@ -137,6 +155,7 @@ export function WorkspaceView({
         <KanbanBoard
           initialColumns={filteredColumns}
           availableTags={availableTags}
+          isAdmin={isAdmin}
         />
       ) : (
         <TaskListView
