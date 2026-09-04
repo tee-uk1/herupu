@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"
-import { LayoutGrid, List, Command, History, Shield, ShieldAlert } from "lucide-react"
+import { LayoutGrid, List, Command, History, Archive, Shield, ShieldAlert } from "lucide-react"
 import { KanbanBoard, ColumnItem } from "./kanban-board"
 import { TaskListView } from "./task-list-view"
 import { TaskDetailDrawer } from "./task-detail-drawer"
@@ -9,20 +9,24 @@ import { TaskItem, TagItem } from "./kanban-card"
 import { WorkspaceFilterBar, FilterState } from "./workspace-filter-bar"
 import { CommandPalette } from "./command-palette"
 import { ActivityLogDrawer, ActivityItem } from "./activity-log-drawer"
+import { ArchiveDrawer } from "./archive-drawer"
 
 export function WorkspaceView({
   initialColumns,
   availableTags = [],
   activities = [],
+  archivedTasks = [],
 }: {
   initialColumns: ColumnItem[]
   availableTags?: TagItem[]
   activities?: ActivityItem[]
+  archivedTasks?: TaskItem[]
 }) {
   const [view, setView] = useState<"board" | "list">("board")
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(true) // Defaults to Admin for your account
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -131,6 +135,18 @@ export function WorkspaceView({
             <History className="w-3.5 h-3.5" />
             <span>Activity</span>
           </button>
+          <button
+            onClick={() => setIsArchiveOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+          >
+            <Archive className="w-3.5 h-3.5 text-amber-400" />
+            <span>Archive</span>
+            {archivedTasks && archivedTasks.length > 0 && (
+              <span className="text-[10px] bg-zinc-800 px-1.5 py-0.2 rounded-full font-mono text-zinc-300">
+                {archivedTasks.length}
+              </span>
+            )}
+          </button>
 
           <button
             onClick={() => setIsPaletteOpen(true)}
@@ -188,6 +204,12 @@ export function WorkspaceView({
         onClose={() => setIsActivityOpen(false)}
         activities={activities}
       />
+      <ArchiveDrawer
+        isOpen={isArchiveOpen}
+        onClose={() => setIsArchiveOpen(false)}
+        archivedTasks={archivedTasks || []}
+      />
     </div>
   )
 }
+

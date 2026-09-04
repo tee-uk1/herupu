@@ -3,7 +3,7 @@
 import React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, CheckSquare, MessageSquare } from "lucide-react"
+import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, CheckSquare, MessageSquare, Globe2 } from "lucide-react"
 
 export type TagItem = {
   id: string
@@ -35,6 +35,8 @@ export type TaskItem = {
   tags?: TagItem[]
   subtasks?: SubtaskItem[]
   comments?: CommentItem[]
+  isPinnedToMaster?: boolean
+  originBoardName?: string
 }
 
 const priorityConfig = {
@@ -55,9 +57,10 @@ function formatDueDate(dueDateInput: string | Date | null | undefined) {
 
   return {
     text: formatted,
-    className: isOverdue ? "text-red-400 bg-red-950/60 border-red-700 animate-pulse font-bold" : isSoon ? "text-amber-300 bg-amber-950/50 border-amber-600/80 font-medium"
+    className: isOverdue
+      ? "text-red-400 bg-red-950/60 border-red-700 animate-pulse font-bold"
       : isSoon
-      ? "text-amber-400 bg-amber-950/40 border-amber-900/60"
+      ? "text-amber-300 bg-amber-950/50 border-amber-600/80 font-medium"
       : "text-zinc-400 bg-zinc-800/80 border-zinc-700/60",
   }
 }
@@ -108,11 +111,24 @@ export function KanbanCard({
         isDragging ? "opacity-30 border-dashed border-blue-500" : "border-zinc-700/80"
       } ${isOverlay ? "shadow-2xl ring-2 ring-blue-500/50 rotate-1 cursor-grabbing bg-zinc-800" : ""}`}
     >
+      {/* Origin Board Badge if rolled up */}
+      {task.originBoardName && (
+        <div className="flex items-center gap-1 text-[10px] text-purple-400 bg-purple-950/50 border border-purple-800/60 px-1.5 py-0.5 rounded w-fit font-medium">
+          <Globe2 className="w-2.5 h-2.5" />
+          <span>{task.originBoardName}</span>
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium text-zinc-100 leading-snug">{task.title}</span>
-        <span className={priority.color} title={priority.label}>
-          <PriorityIcon className="w-4 h-4 shrink-0 mt-0.5" />
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          {task.isPinnedToMaster && (
+            <Globe2 className="w-3.5 h-3.5 text-purple-400" title="Synced to Central Master Board" />
+          )}
+          <span className={priority.color} title={priority.label}>
+            <PriorityIcon className="w-4 h-4" />
+          </span>
+        </div>
       </div>
 
       {task.description && (

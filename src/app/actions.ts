@@ -5,15 +5,24 @@ import { revalidatePath } from "next/cache"
 import { Priority } from "@prisma/client"
 
 async function recordActivity(action: string, details: string) {
-  const project = await prisma.project.findFirst()
-  if (!project) return
   await prisma.activityLog.create({
-    data: {
-      action,
-      details,
-      projectId: project.id,
-    },
+    data: { action, details },
   })
+}
+
+export async function togglePinToMaster(taskId: string, isPinnedToMaster: boolean) {
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: { isPinnedToMaster },
+    include: { column: { include: { board: true } } },
+  })
+
+  await recordActivity(
+    "TASK_SYNC_TOGGLED",
+    `${isPinnedToMaster ? "Pinned" : "Unpinned"} "${updated.title}" ${isPinnedToMaster ? "to" : "from"} Central Master Board`
+  )
+  revalidatePath("/")
+  return updated
 }
 
 export async function updateTaskPosition(
@@ -55,6 +64,7 @@ export async function createTask(data: {
   columnId: string
   dueDate?: string | null
   tagIds?: string[]
+  isPinnedToMaster?: boolean
 }) {
   const count = await prisma.task.count({
     where: { columnId: data.columnId },
@@ -68,6 +78,7 @@ export async function createTask(data: {
       columnId: data.columnId,
       order: count,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      isPinnedToMaster: data.isPinnedToMaster ?? false,
       tags: data.tagIds && data.tagIds.length > 0
         ? { connect: data.tagIds.map((id) => ({ id })) }
         : undefined,
@@ -93,6 +104,7 @@ export async function updateTaskDetails(
     columnId?: string
     dueDate?: string | null
     tagIds?: string[]
+    isPinnedToMaster?: boolean
   }
 ) {
   const updatePayload: any = {}
@@ -100,7 +112,11 @@ export async function updateTaskDetails(
   if (data.title !== undefined) updatePayload.title = data.title
   if (data.description !== undefined) updatePayload.description = data.description
   if (data.priority !== undefined) updatePayload.priority = data.priority
-  if (data.columnId !== undefined) updatePayload.columnId = data.columnId
+  if (data.columnId !== undefined && data.columnId !== "") {
+    // Only update columnId if the destination column belongs to the same board or is explicitly targeted
+    updatePayload.columnId = data.columnId
+  }
+  if (data.isPinnedToMaster !== undefined) updatePayload.isPinnedToMaster = data.isPinnedToMaster
   if (data.dueDate !== undefined) {
     updatePayload.dueDate = data.dueDate ? new Date(data.dueDate) : null
   }
@@ -215,19 +231,29 @@ export async function deleteComment(commentId: string) {
   revalidatePath("/")
 }
 
-export async function createColumn(name: string) {
-  const project = await prisma.project.findFirst()
-  if (!project) return
+export async function createTag(name: string, color: string = "#3b82f6") {
+  const tag = await prisma.tag.create({
+    data: { name, color },
+  })
+  revalidatePath("/")
+  return tag
+}
 
+export async function deleteTag(tagId: string) {
+  await prisma.tag.delete({ where: { id: tagId } })
+  revalidatePath("/")
+}
+
+export async function createColumn(name: string, boardId: string) {
   const count = await prisma.column.count({
-    where: { projectId: project.id },
+    where: { boardId },
   })
 
   const newColumn = await prisma.column.create({
     data: {
       name,
       order: count,
-      projectId: project.id,
+      boardId,
     },
   })
 
@@ -254,5 +280,23 @@ export async function deleteColumn(columnId: string) {
   if (column) {
     await recordActivity("COLUMN_DELETED", `Deleted column "${column.name}"`)
   }
+  revalidatePath("/")
+}
+
+export async function archiveTask(taskId: string) {
+  const task = await prisma.task.update({
+    where: { id: taskId },
+    data: { isArchived: true },
+  })
+  await recordActivity("TASK_ARCHIVED", `Archived task "${task.title}"`)
+  revalidatePath("/")
+}
+
+export async function unarchiveTask(taskId: string) {
+  const task = await prisma.task.update({
+    where: { id: taskId },
+    data: { isArchived: false },
+  })
+  await recordActivity("TASK_RESTORED", `Restored task "${task.title}" from archive`)
   revalidatePath("/")
 }

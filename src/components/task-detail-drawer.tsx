@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { X, Trash2, Calendar, Tag as TagIcon, CheckSquare, Plus, Loader2, MessageSquare, Send } from "lucide-react"
+import { X, Trash2, Archive, Calendar, Tag as TagIcon, CheckSquare, Plus, Loader2, MessageSquare, Send, Globe2 } from "lucide-react"
 import { TaskItem, TagItem, SubtaskItem, CommentItem } from "./kanban-card"
-import { updateTaskDetails, deleteTask, createSubtask, toggleSubtask, deleteSubtask, createComment, deleteComment } from "@/app/actions"
+import { updateTaskDetails, deleteTask, archiveTask, createSubtask, toggleSubtask, deleteSubtask, createComment, deleteComment, createTag } from "@/app/actions"
 
 function formatRelativeTime(dateInput: string | Date) {
   const date = new Date(dateInput)
@@ -33,14 +33,13 @@ export function TaskDetailDrawer({
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM")
   const [columnId, setColumnId] = useState("")
   const [dueDate, setDueDate] = useState("")
+  const [isPinnedToMaster, setIsPinnedToMaster] = useState(false)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   
-  // Subtasks local state
   const [subtasks, setSubtasks] = useState<SubtaskItem[]>([])
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
   const [isAddingSubtask, setIsAddingSubtask] = useState(false)
 
-  // Comments local state
   const [comments, setComments] = useState<CommentItem[]>([])
   const [newCommentContent, setNewCommentContent] = useState("")
   const [isPostingComment, setIsPostingComment] = useState(false)
@@ -53,6 +52,7 @@ export function TaskDetailDrawer({
       setDescription(task.description || "")
       setPriority(task.priority)
       setColumnId(task.columnId)
+      setIsPinnedToMaster(task.isPinnedToMaster || false)
       setDueDate(
         task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : ""
       )
@@ -70,9 +70,10 @@ export function TaskDetailDrawer({
       title,
       description,
       priority,
-      columnId,
+      columnId: task.originBoardName ? task.columnId : columnId,
       dueDate: dueDate || null,
       tagIds: selectedTagIds,
+      isPinnedToMaster,
     })
     setIsSaving(false)
     onClose()
@@ -138,7 +139,7 @@ export function TaskDetailDrawer({
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-zinc-900 border-l border-zinc-800 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
         
-        {/* Drawer Header */}
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-zinc-500">
@@ -149,12 +150,22 @@ export function TaskDetailDrawer({
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDelete}
-              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors"
-              title="Delete Task"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+  onClick={async () => {
+    await archiveTask(task.id)
+    onClose()
+  }}
+  className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded transition-colors"
+  title="Archive Task"
+>
+  <Archive className="w-4 h-4" />
+</button>
+<button
+  onClick={handleDelete}
+  className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors"
+  title="Delete Task"
+>
+  <Trash2 className="w-4 h-4" />
+</button>
             <button
               onClick={onClose}
               className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
@@ -164,9 +175,25 @@ export function TaskDetailDrawer({
           </div>
         </div>
 
-        {/* Drawer Body */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-          {/* Title */}
+          {/* Rollup Pin Toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-purple-950/20 border border-purple-900/40">
+            <div className="flex items-center gap-2.5">
+              <Globe2 className="w-4 h-4 text-purple-400" />
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-purple-200">Rollup to Central Master Board</span>
+                <span className="text-[11px] text-zinc-400">Makes this task visible in the company-wide executive rollup</span>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={isPinnedToMaster}
+              onChange={(e) => setIsPinnedToMaster(e.target.checked)}
+              className="w-4 h-4 rounded bg-zinc-950 border-purple-700 text-purple-600 focus:ring-0 cursor-pointer"
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1">Title</label>
             <input
@@ -177,7 +204,6 @@ export function TaskDetailDrawer({
             />
           </div>
 
-          {/* Status & Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">Status</label>
@@ -209,53 +235,53 @@ export function TaskDetailDrawer({
             </div>
           </div>
 
-          {/* Due Date */}
+          {/* Due Date with Presets */}
           <div>
-  <div className="flex items-center justify-between mb-1.5">
-    <label className="text-xs font-medium text-zinc-400 flex items-center gap-1">
-      <Calendar className="w-3.5 h-3.5" /> Due Date
-    </label>
-    <div className="flex items-center gap-1 text-[10px]">
-      <button
-        type="button"
-        onClick={() => setDueDate(new Date().toISOString().split("T")[0])}
-        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
-      >
-        Today
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          const d = new Date()
-          d.setDate(d.getDate() + 1)
-          setDueDate(d.toISOString().split("T")[0])
-        }}
-        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
-      >
-        Tomorrow
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          const d = new Date()
-          d.setDate(d.getDate() + 7)
-          setDueDate(d.toISOString().split("T")[0])
-        }}
-        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
-      >
-        +1 Wk
-      </button>
-      {dueDate && (
-        <button
-          type="button"
-          onClick={() => setDueDate("")}
-          className="px-1.5 py-0.5 rounded bg-zinc-800/60 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 transition-colors"
-        >
-          Clear
-        </button>
-      )}
-    </div>
-  </div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-zinc-400 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" /> Due Date
+              </label>
+              <div className="flex items-center gap-1 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setDueDate(new Date().toISOString().split("T")[0])}
+                  className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date()
+                    d.setDate(d.getDate() + 1)
+                    setDueDate(d.toISOString().split("T")[0])
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                >
+                  Tomorrow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date()
+                    d.setDate(d.getDate() + 7)
+                    setDueDate(d.toISOString().split("T")[0])
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                >
+                  +1 Wk
+                </button>
+                {dueDate && (
+                  <button
+                    type="button"
+                    onClick={() => setDueDate("")}
+                    className="px-1.5 py-0.5 rounded bg-zinc-800/60 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
             <input
               type="date"
               value={dueDate}
@@ -266,11 +292,24 @@ export function TaskDetailDrawer({
 
           {/* Tags */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-2">
-              <span className="inline-flex items-center gap-1">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-zinc-400 flex items-center gap-1">
                 <TagIcon className="w-3.5 h-3.5" /> Tags
-              </span>
-            </label>
+              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  const name = prompt("Enter tag name:")
+                  if (!name?.trim()) return
+                  const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"]
+                  const color = colors[Math.floor(Math.random() * colors.length)]
+                  await createTag(name.trim(), color)
+                }}
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-normal"
+              >
+                + New Tag
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {availableTags.map((tag) => {
                 const isSelected = selectedTagIds.includes(tag.id)
@@ -376,19 +415,16 @@ export function TaskDetailDrawer({
             />
           </div>
 
-          {/* Activity Comments Discussion Section */}
+          {/* Discussion */}
           <div className="flex flex-col gap-3 pt-4 border-t border-zinc-800">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
-                <span>Discussion & Comments</span>
+                <span>Discussion</span>
               </label>
-              <span className="text-[11px] font-mono text-zinc-500">
-                {comments.length}
-              </span>
+              <span className="text-[11px] font-mono text-zinc-500">{comments.length}</span>
             </div>
 
-            {/* Comment Thread */}
             <div className="flex flex-col gap-3">
               {comments.map((comment) => (
                 <div
@@ -422,48 +458,30 @@ export function TaskDetailDrawer({
                   </div>
                 </div>
               ))}
-
-              {comments.length === 0 && (
-                <div className="py-4 text-center text-xs text-zinc-500 italic">
-                  No comments yet. Start the conversation below.
-                </div>
-              )}
             </div>
 
-            {/* Add Comment Input Form */}
             <form onSubmit={handleAddComment} className="flex flex-col gap-2 mt-2">
               <textarea
                 rows={2}
                 value={newCommentContent}
                 disabled={isPostingComment}
                 onChange={(e) => setNewCommentContent(e.target.value)}
-                placeholder="Write a comment... (Enter to post, Shift+Enter for newline)"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault()
-                    handleAddComment(e)
-                  }
-                }}
+                placeholder="Write a comment..."
                 className="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 rounded-lg p-2.5 text-xs text-zinc-100 placeholder-zinc-500 outline-none transition-all resize-none"
               />
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  Press ↵ Enter to comment
-                </span>
-                <button
-                  type="submit"
-                  disabled={!newCommentContent.trim() || isPostingComment}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
-                >
-                  {isPostingComment ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                  Comment
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={!newCommentContent.trim() || isPostingComment}
+                className="self-end px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5"
+              >
+                {isPostingComment ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                Comment
+              </button>
             </form>
           </div>
         </div>
 
-        {/* Drawer Footer */}
+        {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-800 bg-zinc-900/50">
           <button
             onClick={onClose}
@@ -474,7 +492,7 @@ export function TaskDetailDrawer({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5"
           >
             {isSaving && <Loader2 className="w-3 h-3 animate-spin" />}
             Save Changes
@@ -484,3 +502,4 @@ export function TaskDetailDrawer({
     </div>
   )
 }
+
