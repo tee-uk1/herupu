@@ -1,20 +1,21 @@
 "use client"
 
 import React from "react"
-import { Search, X, Tag as TagIcon } from "lucide-react"
+import { Search, X, Tag as TagIcon, UserCheck, SlidersHorizontal } from "lucide-react"
 import { TagItem } from "./kanban-card"
 
 export type FilterState = {
   search: string
   priorities: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[]
   tagIds: string[]
+  assignedToMe?: boolean
 }
 
-const priorities: { value: "LOW" | "MEDIUM" | "HIGH" | "URGENT"; label: string; color: string }[] = [
-  { value: "URGENT", label: "Urgent", color: "text-red-400 border-red-800 bg-red-950/40" },
-  { value: "HIGH", label: "High", color: "text-amber-400 border-amber-800 bg-amber-950/40" },
-  { value: "MEDIUM", label: "Medium", color: "text-blue-400 border-blue-800 bg-blue-950/40" },
-  { value: "LOW", label: "Low", color: "text-zinc-400 border-zinc-700 bg-zinc-800/40" },
+const priorities: { value: "LOW" | "MEDIUM" | "HIGH" | "URGENT"; label: string; activeColor: string }[] = [
+  { value: "URGENT", label: "Urgent", activeColor: "text-rose-300 border-rose-700/60 bg-rose-950/40 shadow-xs shadow-rose-900/30" },
+  { value: "HIGH", label: "High", activeColor: "text-amber-300 border-amber-700/60 bg-amber-950/40 shadow-xs shadow-amber-900/30" },
+  { value: "MEDIUM", label: "Medium", activeColor: "text-indigo-300 border-indigo-700/60 bg-indigo-950/40 shadow-xs shadow-indigo-900/30" },
+  { value: "LOW", label: "Low", activeColor: "text-zinc-300 border-zinc-600/60 bg-zinc-800/60" },
 ]
 
 export function WorkspaceFilterBar({
@@ -41,35 +42,54 @@ export function WorkspaceFilterBar({
   }
 
   const hasActiveFilters =
-    filters.search.length > 0 || filters.priorities.length > 0 || filters.tagIds.length > 0
+    filters.search.length > 0 ||
+    filters.priorities.length > 0 ||
+    filters.tagIds.length > 0 ||
+    Boolean(filters.assignedToMe)
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900/60 border border-zinc-800/80 p-2.5 rounded-lg">
+    <div className="flex flex-wrap items-center justify-between gap-2.5 bg-[#0e1014]/60 backdrop-blur-md border border-white/[0.06] p-2 rounded-xl shadow-xs">
       <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
-        {/* Search input */}
-        <div className="relative flex items-center min-w-[180px] max-w-xs flex-1">
-          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 pointer-events-none" />
+        {/* Search */}
+        <div className="relative flex items-center min-w-[200px] max-w-sm flex-1">
+          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 pointer-events-none" />
           <input
             type="text"
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            placeholder="Filter by title, notes, ID..."
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-md pl-8 pr-3 py-1 text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-blue-500"
+            placeholder="Search tasks, notes, HERUPU-ID..."
+            className="w-full bg-black/40 border border-white/[0.06] focus:border-indigo-500/60 rounded-lg pl-8 pr-12 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 outline-none transition-all focus:ring-1 focus:ring-indigo-500/30"
           />
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-500 bg-white/[0.05] border border-white/[0.08] px-1 py-0.2 rounded pointer-events-none">
+            ⌘K
+          </kbd>
         </div>
 
-        {/* Priority Filters */}
-        <div className="flex items-center gap-1">
+        {/* My Tasks Toggle */}
+        <button
+          onClick={() => onChange({ ...filters, assignedToMe: !filters.assignedToMe })}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+            filters.assignedToMe
+              ? "bg-indigo-950/60 border-indigo-500 text-indigo-200 shadow-sm shadow-indigo-500/20 ring-1 ring-indigo-500/30"
+              : "border-white/[0.06] bg-white/[0.02] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]"
+          }`}
+        >
+          <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
+          <span>My Tasks</span>
+        </button>
+
+        {/* Priorities */}
+        <div className="flex items-center gap-1 bg-black/30 border border-white/[0.05] p-0.5 rounded-lg">
           {priorities.map((p) => {
             const isSelected = filters.priorities.includes(p.value)
             return (
               <button
                 key={p.value}
                 onClick={() => togglePriority(p.value)}
-                className={`px-2 py-1 rounded text-[11px] font-medium border transition-all ${
+                className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-all ${
                   isSelected
-                    ? p.color
-                    : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                    ? p.activeColor
+                    : "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]"
                 }`}
               >
                 {p.label}
@@ -78,9 +98,9 @@ export function WorkspaceFilterBar({
           })}
         </div>
 
-        {/* Tag Filters */}
+        {/* Tags */}
         {availableTags.length > 0 && (
-          <div className="flex items-center gap-1 pl-2 border-l border-zinc-800/80">
+          <div className="flex items-center gap-1 pl-2 border-l border-white/[0.06]">
             <TagIcon className="w-3 h-3 text-zinc-500 mr-0.5" />
             {availableTags.map((tag) => {
               const isSelected = filters.tagIds.includes(tag.id)
@@ -88,14 +108,14 @@ export function WorkspaceFilterBar({
                 <button
                   key={tag.id}
                   onClick={() => toggleTag(tag.id)}
-                  className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium ${
                     isSelected
-                      ? "ring-1 ring-white/40 opacity-100 font-medium scale-105"
-                      : "opacity-40 hover:opacity-75"
+                      ? "ring-1 ring-white/50 opacity-100 scale-105 shadow-xs"
+                      : "opacity-40 hover:opacity-80"
                   }`}
                   style={{
-                    backgroundColor: `${tag.color}25`,
-                    borderColor: `${tag.color}60`,
+                    backgroundColor: `${tag.color}20`,
+                    borderColor: `${tag.color}45`,
                     color: tag.color,
                   }}
                 >
@@ -107,14 +127,13 @@ export function WorkspaceFilterBar({
         )}
       </div>
 
-      {/* Clear Filters Reset */}
       {hasActiveFilters && (
         <button
-          onClick={() => onChange({ search: "", priorities: [], tagIds: [] })}
-          className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-red-400 px-2 py-1 rounded hover:bg-zinc-800/50 transition-colors"
+          onClick={() => onChange({ search: "", priorities: [], tagIds: [], assignedToMe: false })}
+          className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-rose-400 px-2 py-1 rounded hover:bg-rose-950/20 transition-colors"
         >
           <X className="w-3 h-3" />
-          <span>Clear</span>
+          <span>Reset</span>
         </button>
       )}
     </div>

@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { X, Trash2, Archive, Calendar, Tag as TagIcon, CheckSquare, Plus, Loader2, MessageSquare, Send, Globe2 } from "lucide-react"
-import { TaskItem, TagItem, SubtaskItem, CommentItem } from "./kanban-card"
+import { X, Trash2, Calendar, Tag as TagIcon, CheckSquare, Plus, Loader2, MessageSquare, Send, Globe2, Archive, UserCheck } from "lucide-react"
+import { TaskItem, TagItem, SubtaskItem, CommentItem, UserItem } from "./kanban-card"
 import { updateTaskDetails, deleteTask, archiveTask, createSubtask, toggleSubtask, deleteSubtask, createComment, deleteComment, createTag } from "@/app/actions"
+import { useSession } from "next-auth/react"
 
 function formatRelativeTime(dateInput: string | Date) {
   const date = new Date(dateInput)
@@ -21,18 +22,22 @@ export function TaskDetailDrawer({
   task,
   columns,
   availableTags,
+  availableUsers = [],
   onClose,
 }: {
   task: TaskItem | null
   columns: { id: string; name: string }[]
   availableTags: TagItem[]
+  availableUsers?: UserItem[]
   onClose: () => void
 }) {
+  const { data: session } = useSession()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM")
   const [columnId, setColumnId] = useState("")
   const [dueDate, setDueDate] = useState("")
+  const [assignedToId, setAssignedToId] = useState<string>("")
   const [isPinnedToMaster, setIsPinnedToMaster] = useState(false)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   
@@ -52,10 +57,9 @@ export function TaskDetailDrawer({
       setDescription(task.description || "")
       setPriority(task.priority)
       setColumnId(task.columnId)
+      setAssignedToId(task.assignedToId || "")
       setIsPinnedToMaster(task.isPinnedToMaster || false)
-      setDueDate(
-        task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : ""
-      )
+      setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "")
       setSelectedTagIds(task.tags ? task.tags.map((t) => t.id) : [])
       setSubtasks(task.subtasks || [])
       setComments(task.comments || [])
@@ -72,6 +76,7 @@ export function TaskDetailDrawer({
       priority,
       columnId: task.originBoardName ? task.columnId : columnId,
       dueDate: dueDate || null,
+      assignedToId: assignedToId || null,
       tagIds: selectedTagIds,
       isPinnedToMaster,
     })
@@ -122,8 +127,16 @@ export function TaskDetailDrawer({
     if (!trimmed || isPostingComment) return
 
     setIsPostingComment(true)
-    const created = await createComment(task.id, trimmed, "tee-uk1")
-    setComments((prev) => [...prev, created])
+    const created = await createComment(task.id, trimmed)
+    setComments((prev) => [
+      ...prev,
+      {
+        id: created.id,
+        content: created.content,
+        authorName: session?.user?.name || "Member",
+        createdAt: created.createdAt,
+      },
+    ])
     setNewCommentContent("")
     setIsPostingComment(false)
   }
@@ -138,34 +151,31 @@ export function TaskDetailDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-zinc-900 border-l border-zinc-800 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
-        
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-zinc-500">
-              HERUPU-{task.id.slice(-4)}
-            </span>
+            <span className="text-xs font-mono text-zinc-500">HERUPU-{task.id.slice(-4)}</span>
             <span className="text-zinc-600">/</span>
             <span className="text-xs font-medium text-zinc-400">Task Details</span>
           </div>
           <div className="flex items-center gap-2">
             <button
-  onClick={async () => {
-    await archiveTask(task.id)
-    onClose()
-  }}
-  className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded transition-colors"
-  title="Archive Task"
->
-  <Archive className="w-4 h-4" />
-</button>
-<button
-  onClick={handleDelete}
-  className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors"
-  title="Delete Task"
->
-  <Trash2 className="w-4 h-4" />
-</button>
+              onClick={async () => {
+                await archiveTask(task.id)
+                onClose()
+              }}
+              className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded transition-colors"
+              title="Archive Task"
+            >
+              <Archive className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleDelete}
+              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded transition-colors"
+              title="Delete Task"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
             <button
               onClick={onClose}
               className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
@@ -183,7 +193,7 @@ export function TaskDetailDrawer({
               <Globe2 className="w-4 h-4 text-purple-400" />
               <div className="flex flex-col">
                 <span className="text-xs font-semibold text-purple-200">Rollup to Central Master Board</span>
-                <span className="text-[11px] text-zinc-400">Makes this task visible in the company-wide executive rollup</span>
+                <span className="text-[11px] text-zinc-400">Makes this task visible in the executive rollup</span>
               </div>
             </div>
             <input
@@ -204,13 +214,13 @@ export function TaskDetailDrawer({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">Status</label>
               <select
                 value={columnId}
                 onChange={(e) => setColumnId(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-2 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
               >
                 {columns.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -225,12 +235,28 @@ export function TaskDetailDrawer({
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-2 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
               >
                 <option value="LOW">Low</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>
                 <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Assignee</label>
+              <select
+                value={assignedToId}
+                onChange={(e) => setAssignedToId(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-2 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="">Unassigned</option>
+                {availableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -365,9 +391,7 @@ export function TaskDetailDrawer({
                     />
                     <span
                       className={`text-xs truncate transition-all ${
-                        subtask.isCompleted
-                          ? "line-through text-zinc-500 italic"
-                          : "text-zinc-200"
+                        subtask.isCompleted ? "line-through text-zinc-500 italic" : "text-zinc-200"
                       }`}
                     >
                       {subtask.title}
@@ -432,13 +456,11 @@ export function TaskDetailDrawer({
                   className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-950/70 border border-zinc-800/80 group"
                 >
                   <div className="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center text-[10px] font-semibold shrink-0">
-                    {comment.author.slice(0, 2).toUpperCase()}
+                    {comment.authorName.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-zinc-300">
-                        {comment.author}
-                      </span>
+                      <span className="text-[11px] font-semibold text-zinc-300">{comment.authorName}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-zinc-500 font-mono">
                           {formatRelativeTime(comment.createdAt)}
@@ -452,9 +474,7 @@ export function TaskDetailDrawer({
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs text-zinc-200 mt-1 whitespace-pre-wrap leading-relaxed">
-                      {comment.content}
-                    </p>
+                    <p className="text-xs text-zinc-200 mt-1 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
                   </div>
                 </div>
               ))}
@@ -483,10 +503,7 @@ export function TaskDetailDrawer({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-800 bg-zinc-900/50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
-          >
+          <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
             Cancel
           </button>
           <button
@@ -502,4 +519,3 @@ export function TaskDetailDrawer({
     </div>
   )
 }
-

@@ -5,6 +5,13 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { AlertCircle, ArrowUp, ArrowRight, ArrowDown, Calendar, CheckSquare, MessageSquare, Globe2 } from "lucide-react"
 
+export type UserItem = {
+  id: string
+  name: string | null
+  email: string
+  role: "ADMIN" | "MEMBER"
+}
+
 export type TagItem = {
   id: string
   name: string
@@ -20,7 +27,8 @@ export type SubtaskItem = {
 export type CommentItem = {
   id: string
   content: string
-  author: string
+  authorName: string
+  authorId?: string | null
   createdAt: string | Date
 }
 
@@ -35,15 +43,17 @@ export type TaskItem = {
   tags?: TagItem[]
   subtasks?: SubtaskItem[]
   comments?: CommentItem[]
+  assignedToId?: string | null
+  assignedTo?: UserItem | null
   isPinnedToMaster?: boolean
   originBoardName?: string
 }
 
 const priorityConfig = {
-  URGENT: { label: "Urgent", color: "text-red-500", icon: AlertCircle },
-  HIGH: { label: "High", color: "text-amber-500", icon: ArrowUp },
-  MEDIUM: { label: "Medium", color: "text-blue-500", icon: ArrowRight },
-  LOW: { label: "Low", color: "text-zinc-400", icon: ArrowDown },
+  URGENT: { label: "Urgent", color: "text-red-400", bg: "bg-red-950/40 border-red-800/60", icon: AlertCircle },
+  HIGH: { label: "High", color: "text-amber-400", bg: "bg-amber-950/40 border-amber-800/60", icon: ArrowUp },
+  MEDIUM: { label: "Medium", color: "text-blue-400", bg: "bg-blue-950/40 border-blue-800/60", icon: ArrowRight },
+  LOW: { label: "Low", color: "text-zinc-400", bg: "bg-zinc-800/40 border-zinc-700/60", icon: ArrowDown },
 }
 
 function formatDueDate(dueDateInput: string | Date | null | undefined) {
@@ -58,10 +68,10 @@ function formatDueDate(dueDateInput: string | Date | null | undefined) {
   return {
     text: formatted,
     className: isOverdue
-      ? "text-red-400 bg-red-950/60 border-red-700 animate-pulse font-bold"
+      ? "text-red-400 bg-red-950/60 border-red-800/80 font-semibold animate-pulse"
       : isSoon
-      ? "text-amber-300 bg-amber-950/50 border-amber-600/80 font-medium"
-      : "text-zinc-400 bg-zinc-800/80 border-zinc-700/60",
+      ? "text-amber-300 bg-amber-950/50 border-amber-700/60 font-medium"
+      : "text-zinc-400 bg-zinc-800/60 border-zinc-700/50",
   }
 }
 
@@ -107,26 +117,27 @@ export function KanbanCard({
       {...attributes}
       {...listeners}
       onClick={() => onTaskClick?.(task)}
-      className={`p-3 bg-zinc-800/90 rounded-md border text-sm cursor-grab active:cursor-grabbing hover:border-zinc-600 transition-all select-none flex flex-col gap-2 ${
-        isDragging ? "opacity-30 border-dashed border-blue-500" : "border-zinc-700/80"
-      } ${isOverlay ? "shadow-2xl ring-2 ring-blue-500/50 rotate-1 cursor-grabbing bg-zinc-800" : ""}`}
+      className={`group p-3.5 bg-zinc-900/70 hover:bg-zinc-900 border rounded-lg text-sm cursor-grab active:cursor-grabbing transition-all select-none flex flex-col gap-2.5 shadow-xs hover:shadow-lg hover:border-zinc-700/80 ${
+        isDragging ? "opacity-30 border-dashed border-indigo-500 scale-95" : "border-zinc-800/70"
+      } ${isOverlay ? "shadow-2xl ring-2 ring-indigo-500/50 rotate-1 cursor-grabbing bg-zinc-900 border-zinc-700" : ""}`}
     >
-      {/* Origin Board Badge if rolled up */}
       {task.originBoardName && (
-        <div className="flex items-center gap-1 text-[10px] text-purple-400 bg-purple-950/50 border border-purple-800/60 px-1.5 py-0.5 rounded w-fit font-medium">
-          <Globe2 className="w-2.5 h-2.5" />
+        <div className="flex items-center gap-1 text-[9px] text-purple-300 bg-purple-950/50 border border-purple-800/50 px-1.5 py-0.5 rounded w-fit font-mono font-medium">
+          <Globe2 className="w-2.5 h-2.5 text-purple-400" />
           <span>{task.originBoardName}</span>
         </div>
       )}
 
       <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-zinc-100 leading-snug">{task.title}</span>
+        <span className="font-semibold text-zinc-100 group-hover:text-white leading-snug tracking-tight">
+          {task.title}
+        </span>
         <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
           {task.isPinnedToMaster && (
-            <Globe2 className="w-3.5 h-3.5 text-purple-400" title="Synced to Central Master Board" />
+            <Globe2 className="w-3.5 h-3.5 text-purple-400" title="Rollup Synced" />
           )}
-          <span className={priority.color} title={priority.label}>
-            <PriorityIcon className="w-4 h-4" />
+          <span className={`p-0.5 rounded ${priority.bg} ${priority.color}`} title={priority.label}>
+            <PriorityIcon className="w-3.5 h-3.5" />
           </span>
         </div>
       </div>
@@ -146,10 +157,10 @@ export function KanbanCard({
             </span>
             <span>{Math.round(progressPercent)}%</span>
           </div>
-          <div className="h-1 w-full bg-zinc-700/60 rounded-full overflow-hidden">
+          <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${
-                progressPercent === 100 ? "bg-emerald-500" : "bg-blue-500"
+                progressPercent === 100 ? "bg-emerald-500" : "bg-indigo-500"
               }`}
               style={{ width: `${progressPercent}%` }}
             />
@@ -157,13 +168,26 @@ export function KanbanCard({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 mt-auto border-t border-zinc-700/40">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 mt-auto border-t border-zinc-800/60">
         <div className="flex flex-wrap items-center gap-1.5">
+          {task.assignedTo && (
+            <div
+              className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-700 to-indigo-600 text-white border border-indigo-400/40 flex items-center justify-center text-[9px] font-bold shadow-xs"
+              title={`Assigned to ${task.assignedTo.name || task.assignedTo.email}`}
+            >
+              {(task.assignedTo.name || task.assignedTo.email).slice(0, 2).toUpperCase()}
+            </div>
+          )}
+
           {task.tags?.map((tag) => (
             <span
               key={tag.id}
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-white/10"
-              style={{ backgroundColor: `${tag.color}25`, color: tag.color }}
+              className="text-[10px] font-medium px-2 py-0.5 rounded-md border"
+              style={{
+                backgroundColor: `${tag.color}15`,
+                borderColor: `${tag.color}35`,
+                color: tag.color,
+              }}
             >
               {tag.name}
             </span>
@@ -179,7 +203,7 @@ export function KanbanCard({
 
         {dueDateInfo && (
           <span
-            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-mono shrink-0 ml-auto ${dueDateInfo.className}`}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-mono shrink-0 ml-auto ${dueDateInfo.className}`}
           >
             <Calendar className="w-2.5 h-2.5" />
             {dueDateInfo.text}
