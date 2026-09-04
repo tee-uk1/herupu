@@ -300,3 +300,27 @@ export async function unarchiveTask(taskId: string) {
   await recordActivity("TASK_RESTORED", `Restored task "${task.title}" from archive`)
   revalidatePath("/")
 }
+
+export async function createBoard(name: string, isMaster: boolean = false) {
+  const workspace = await prisma.workspace.findFirst()
+  if (!workspace) return
+
+  const defaultCols = isMaster
+    ? [{ name: "To Do", order: 0 }, { name: "In Progress", order: 1 }, { name: "Done", order: 2 }]
+    : [{ name: "Backlog", order: 0 }, { name: "In Progress", order: 1 }, { name: "Done", order: 2 }]
+
+  const board = await prisma.board.create({
+    data: {
+      name,
+      isMaster,
+      workspaceId: workspace.id,
+      columns: {
+        create: defaultCols,
+      },
+    },
+  })
+
+  await recordActivity("BOARD_CREATED", `Created new ${isMaster ? "Rollup" : "Team"} board "${name}"`)
+  revalidatePath("/")
+  return board
+}

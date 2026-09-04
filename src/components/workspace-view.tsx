@@ -10,6 +10,7 @@ import { WorkspaceFilterBar, FilterState } from "./workspace-filter-bar"
 import { CommandPalette } from "./command-palette"
 import { ActivityLogDrawer, ActivityItem } from "./activity-log-drawer"
 import { ArchiveDrawer } from "./archive-drawer"
+import { useRole } from "./role-context"
 
 export function WorkspaceView({
   initialColumns,
@@ -27,7 +28,7 @@ export function WorkspaceView({
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [isArchiveOpen, setIsArchiveOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(true) // Defaults to Admin for your account
+  const { isAdmin, setIsAdmin } = useRole() // Defaults to Admin for your account
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     priorities: [],
@@ -212,4 +213,5 @@ export function WorkspaceView({
     </div>
   )
 }
+
 

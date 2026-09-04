@@ -1,7 +1,11 @@
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
+import { UserProfileButton } from "@/components/user-profile-button"
 import { prisma } from "@/lib/prisma"
 import { ColumnItem } from "@/components/kanban-board"
 import { WorkspaceView } from "@/components/workspace-view"
 import { CreateTaskDialog } from "@/components/create-task-dialog"
+import { CreateBoardDialog } from "@/components/create-board-dialog"
 import { ActivityItem } from "@/components/activity-log-drawer"
 import { TaskItem } from "@/components/kanban-card"
 import { LayoutDashboard, Users, Layers } from "lucide-react"
@@ -12,6 +16,10 @@ export default async function Home({
 }: {
   searchParams: Promise<{ boardId?: string }>
 }) {
+    const session = await auth()
+  if (!session?.user) {
+    redirect("/login")
+  }
   const resolvedParams = await searchParams
   let boards = await prisma.board.findMany({
     orderBy: { createdAt: "asc" },
@@ -175,12 +183,16 @@ export default async function Home({
               )
             })}
           </div>
+            <CreateBoardDialog />
         </div>
 
-        <CreateTaskDialog
+        <div className="flex items-center gap-3">
+          <CreateTaskDialog
           columns={columns.map((c) => ({ id: c.id, name: c.name }))}
           availableTags={tags}
-        />
+          />
+          <UserProfileButton user={session.user as any} />
+        </div>
       </header>
 
       <section>
@@ -194,5 +206,7 @@ export default async function Home({
     </main>
   )
 }
+
+
 
 

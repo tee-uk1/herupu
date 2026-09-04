@@ -7,6 +7,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id            String       @id @default(cuid())
+  name          String?
+  email         String       @unique
+  passwordHash  String
+  role          Role         @default(MEMBER)
+  assignedTasks Task[]       @relation("AssignedTasks")
+  comments      Comment[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
 model Workspace {
   id        String   @id @default(cuid())
   name      String
@@ -16,15 +33,15 @@ model Workspace {
 }
 
 model Board {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  isMaster    Boolean  @default(false)
+  isMaster    Boolean   @default(false)
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   columns     Column[]
-  syncedTasks Task[]   @relation("BoardSyncedTasks")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  syncedTasks Task[]    @relation("BoardSyncedTasks")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Column {
@@ -46,22 +63,24 @@ enum Priority {
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  priority    Priority  @default(MEDIUM)
-  order       Int
-  dueDate     DateTime?
-  columnId    String
-  column      Column    @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  syncedBoards Board[]  @relation("BoardSyncedTasks")
-  isPinnedToMaster Boolean @default(false)
-  isArchived       Boolean  @default(false)
-  tags        Tag[]
-  subtasks    Subtask[]
-  comments    Comment[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  priority         Priority  @default(MEDIUM)
+  order            Int
+  dueDate          DateTime?
+  columnId         String
+  column           Column    @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  assignedToId     String?
+  assignedTo       User?     @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  syncedBoards     Board[]   @relation("BoardSyncedTasks")
+  isPinnedToMaster Boolean   @default(false)
+  isArchived       Boolean   @default(false)
+  tags             Tag[]
+  subtasks         Subtask[]
+  comments         Comment[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Subtask {
@@ -77,7 +96,9 @@ model Subtask {
 model Comment {
   id        String   @id @default(cuid())
   content   String
-  author    String   @default("tee-uk1")
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorName String  @default("Member")
   taskId    String
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -99,4 +120,3 @@ model ActivityLog {
   details   String
   createdAt DateTime @default(now())
 }
-
