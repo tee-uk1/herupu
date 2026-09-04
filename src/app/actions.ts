@@ -337,3 +337,157 @@ export async function toggleUserRole(userId: string, currentRole: Role) {
   revalidatePath("/")
   return user
 }
+// Google Drive & Attachment Helpers
+function detectGoogleDriveType(url: string): string {
+  if (url.includes("docs.google.com/document")) return "DOC"
+  if (url.includes("docs.google.com/spreadsheets")) return "SHEET"
+  if (url.includes("docs.google.com/presentation")) return "SLIDES"
+  if (url.includes("drive.google.com/drive/folders")) return "FOLDER"
+  if (url.includes("drive.google.com")) return "DRIVE_FILE"
+  return "LINK"
+}
+
+export async function addGoogleDriveAttachment(taskId: string, url: string, customName?: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const cleanUrl = url.trim()
+  if (!cleanUrl) throw new Error("URL is required")
+
+  const fileType = detectGoogleDriveType(cleanUrl)
+  
+  let fallbackName = "Google Drive Resource"
+  if (fileType === "DOC") fallbackName = "Google Document"
+  else if (fileType === "SHEET") fallbackName = "Google Spreadsheet"
+  else if (fileType === "SLIDES") fallbackName = "Google Presentation"
+  else if (fileType === "FOLDER") fallbackName = "Google Drive Folder"
+
+  const finalName = customName?.trim() || fallbackName
+
+  const attachment = await prisma.taskAttachment.create({
+    data: {
+      taskId,
+      url: cleanUrl,
+      name: finalName,
+      fileType,
+    },
+  })
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { title: true },
+  })
+
+  await prisma.activityLog.create({
+    data: {
+      action: "ATTACHMENT_ADDED",
+      details: `Attached ${finalName} (${fileType}) to task "${task?.title || taskId}"`,
+      userId: session.user.id,
+      userName: session.user.name || session.user.email || "Member",
+    },
+  })
+
+  revalidatePath("/")
+  return attachment
+}
+
+export async function deleteAttachment(attachmentId: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  await prisma.taskAttachment.delete({
+    where: { id: attachmentId },
+  })
+
+  revalidatePath("/")
+}
+
+export async function addComment(taskId: string, content: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const cleanContent = content.trim()
+  if (!cleanContent) return
+
+  const comment = await prisma.comment.create({
+    data: {
+      taskId,
+      content: cleanContent,
+      authorId: session.user.id,
+      authorName: session.user.name || session.user.email || "Member",
+    },
+  })
+
+  await prisma.activityLog.create({
+    data: {
+      action: "COMMENT_ADDED",
+      details: `Commented on task: "${cleanContent.slice(0, 40)}..."`,
+      userId: session.user.id,
+      userName: session.user.name || session.user.email || "Member",
+    },
+  })
+
+  revalidatePath("/")
+  return comment
+}
+
+export async function addSubtask(taskId: string, title: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const cleanTitle = title.trim()
+  if (!cleanTitle) return
+
+  const subtask = await prisma.subtask.create({
+    data: {
+      taskId,
+      title: cleanTitle,
+      isCompleted: false,
+    },
+  })
+
+  revalidatePath("/")
+  return subtask
+}
+
+
+
+// Native Document Helpers
+export async function createDocument(title: string, options?: { taskId?: string, workspaceId?: string }) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const doc = await prisma.document.create({
+    data: {
+      title: title || "Untitled Document",
+      authorId: session.user.id,
+      authorName: session.user.name || session.user.email || "Unknown",
+      taskId: options?.taskId,
+      workspaceId: options?.workspaceId,
+    },
+  })
+  
+  revalidatePath("/")
+  return doc
+}
+
+export async function updateDocument(id: string, data: { title?: string, content?: string }) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const doc = await prisma.document.update({
+    where: { id },
+    data,
+  })
+  
+  revalidatePath("/")
+  return doc
+}
+
+export async function deleteDocument(id: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  await prisma.document.delete({ where: { id } })
+  revalidatePath("/")
+}

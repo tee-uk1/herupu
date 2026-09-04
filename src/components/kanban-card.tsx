@@ -32,6 +32,15 @@ export type CommentItem = {
   createdAt: string | Date
 }
 
+export type TaskAttachmentItem = {
+  id: string
+  taskId: string
+  name: string
+  url: string
+  fileType: "DOC" | "SHEET" | "SLIDES" | "FOLDER" | "DRIVE_FILE" | "LINK"
+  createdAt: string | Date
+}
+
 export type TaskItem = {
   id: string
   title: string
@@ -43,6 +52,7 @@ export type TaskItem = {
   tags?: TagItem[]
   subtasks?: SubtaskItem[]
   comments?: CommentItem[]
+  attachments?: TaskAttachmentItem[]
   assignedToId?: string | null
   assignedTo?: UserItem | null
   isPinnedToMaster?: boolean

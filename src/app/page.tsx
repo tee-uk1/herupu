@@ -96,6 +96,7 @@ export default async function Home({
                 assignedTo: true,
                 subtasks: { orderBy: { createdAt: "asc" } },
                 comments: { orderBy: { createdAt: "asc" } },
+                attachments: { orderBy: { createdAt: "desc" } },
               },
             },
           },
@@ -111,6 +112,7 @@ export default async function Home({
         assignedTo: true,
         subtasks: { orderBy: { createdAt: "asc" } },
         comments: { orderBy: { createdAt: "asc" } },
+                attachments: { orderBy: { createdAt: "desc" } },
         column: { include: { board: true } },
       },
     }),
@@ -217,3 +219,4 @@ export default async function Home({
     </div>
   )
 }
+
