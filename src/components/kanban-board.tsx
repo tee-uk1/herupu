@@ -20,7 +20,8 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
-import { KanbanCard, TaskItem } from "./kanban-card"
+import { KanbanCard, TaskItem, TagItem } from "./kanban-card"
+import { TaskDetailDrawer } from "./task-detail-drawer"
 import { updateTaskPosition } from "@/app/actions"
 
 export type ColumnItem = {
@@ -61,13 +62,26 @@ function DroppableColumn({
   )
 }
 
-export function KanbanBoard({ initialColumns }: { initialColumns: ColumnItem[] }) {
+export function KanbanBoard({
+  initialColumns,
+  availableTags = [],
+}: {
+  initialColumns: ColumnItem[]
+  availableTags?: TagItem[]
+}) {
   const [columns, setColumns] = useState<ColumnItem[]>(initialColumns)
   const [activeTask, setActiveTask] = useState<TaskItem | null>(null)
+  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setColumns(initialColumns)
+    if (selectedTask) {
+      const refreshed = initialColumns
+        .flatMap((c) => c.tasks)
+        .find((t) => t.id === selectedTask.id)
+      if (refreshed) setSelectedTask(refreshed)
+    }
   }, [initialColumns])
 
   useEffect(() => {
@@ -215,44 +229,57 @@ export function KanbanBoard({ initialColumns }: { initialColumns: ColumnItem[] }
   }
 
   return (
-    <DndContext
-      id="kanban-board-dnd"
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-        {columns.map((column) => {
-          const taskIds = column.tasks.map((t) => t.id)
+    <>
+      <DndContext
+        id="kanban-board-dnd"
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+          {columns.map((column) => {
+            const taskIds = column.tasks.map((t) => t.id)
 
-          return (
-            <DroppableColumn key={column.id} column={column}>
-              <SortableContext
-                id={column.id}
-                items={taskIds}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="flex flex-col gap-2 min-h-[160px] rounded-md p-1">
-                  {column.tasks.map((task) => (
-                    <KanbanCard key={task.id} task={task} />
-                  ))}
-                  {column.tasks.length === 0 && (
-                    <div className="h-28 flex items-center justify-center border border-dashed border-zinc-800/80 rounded text-xs text-zinc-500 select-none">
-                      Drop here
-                    </div>
-                  )}
-                </div>
-              </SortableContext>
-            </DroppableColumn>
-          )
-        })}
-      </div>
+            return (
+              <DroppableColumn key={column.id} column={column}>
+                <SortableContext
+                  id={column.id}
+                  items={taskIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex flex-col gap-2 min-h-[160px] rounded-md p-1">
+                    {column.tasks.map((task) => (
+                      <KanbanCard
+                        key={task.id}
+                        task={task}
+                        onTaskClick={(t) => setSelectedTask(t)}
+                      />
+                    ))}
+                    {column.tasks.length === 0 && (
+                      <div className="h-28 flex items-center justify-center border border-dashed border-zinc-800/80 rounded text-xs text-zinc-500 select-none">
+                        Drop here
+                      </div>
+                    )}
+                  </div>
+                </SortableContext>
+              </DroppableColumn>
+            )
+          })}
+        </div>
 
-      <DragOverlay>
-        {activeTask ? <KanbanCard task={activeTask} isOverlay /> : null}
-      </DragOverlay>
-    </DndContext>
+        <DragOverlay>
+          {activeTask ? <KanbanCard task={activeTask} isOverlay /> : null}
+        </DragOverlay>
+      </DndContext>
+
+      <TaskDetailDrawer
+        task={selectedTask}
+        columns={columns.map((c) => ({ id: c.id, name: c.name }))}
+        availableTags={availableTags}
+        onClose={() => setSelectedTask(null)}
+      />
+    </>
   )
 }

@@ -43,7 +43,7 @@ export default async function Home() {
       </header>
 
       <section>
-        <KanbanBoard initialColumns={columns} />
+        <KanbanBoard initialColumns={columns} availableTags={tags} />
       </section>
     </main>
   )

@@ -51,9 +51,11 @@ function formatDueDate(dueDateInput: string | Date | null | undefined) {
 export function KanbanCard({
   task,
   isOverlay = false,
+  onTaskClick,
 }: {
   task: TaskItem
   isOverlay?: boolean
+  onTaskClick?: (task: TaskItem) => void
 }) {
   const {
     attributes,
@@ -90,8 +92,9 @@ export function KanbanCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-lg p-3 flex flex-col gap-2.5 select-none touch-none cursor-grab active:cursor-grabbing transition-all shadow-sm ${
-        isOverlay ? "shadow-2xl ring-2 ring-blue-500/50 rotate-1 bg-zinc-850" : ""
+      onClick={() => onTaskClick && onTaskClick(task)}
+      className={`group bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-zinc-700 rounded-lg p-3 flex flex-col gap-2.5 select-none touch-none cursor-pointer transition-all shadow-sm ${
+        isOverlay ? "shadow-2xl ring-2 ring-blue-500/50 rotate-1 bg-zinc-850 cursor-grabbing" : ""
       }`}
     >
       {/* Tags */}
@@ -110,7 +113,7 @@ export function KanbanCard({
       )}
 
       {/* Title */}
-      <span className="text-sm font-medium text-zinc-100 leading-snug">
+      <span className="text-sm font-medium text-zinc-100 group-hover:text-blue-400 transition-colors leading-snug">
         {task.title}
       </span>
 
@@ -121,7 +124,7 @@ export function KanbanCard({
         </p>
       )}
 
-      {/* Meta Row: Priority & Due Date */}
+      {/* Meta Row */}
       <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60 text-xs">
         <div className="flex items-center gap-1.5 text-zinc-400">
           {priorityIcons[task.priority]}

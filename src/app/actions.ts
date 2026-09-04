@@ -62,3 +62,52 @@ export async function createTask(formData: {
     return { success: false, error }
   }
 }
+
+export async function updateTaskDetails(
+  taskId: string,
+  data: {
+    title?: string
+    description?: string | null
+    priority?: Priority
+    columnId?: string
+    dueDate?: string | null
+    tagIds?: string[]
+  }
+) {
+  try {
+    await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
+        columnId: data.columnId,
+        dueDate: data.dueDate !== undefined ? (data.dueDate ? new Date(data.dueDate) : null) : undefined,
+        tags: data.tagIds
+          ? {
+              set: data.tagIds.map((id) => ({ id })),
+            }
+          : undefined,
+      },
+    })
+
+    revalidatePath("/")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update task details:", error)
+    return { success: false, error }
+  }
+}
+
+export async function deleteTask(taskId: string) {
+  try {
+    await prisma.task.delete({
+      where: { id: taskId },
+    })
+    revalidatePath("/")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete task:", error)
+    return { success: false, error }
+  }
+}
