@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
-import { KanbanBoard, ColumnItem } from "@/components/kanban-board"
+import { ColumnItem } from "@/components/kanban-board"
+import { WorkspaceView } from "@/components/workspace-view"
 import { CreateTaskDialog } from "@/components/create-task-dialog"
 
 export default async function Home() {
@@ -43,7 +44,7 @@ export default async function Home() {
       </header>
 
       <section>
-        <KanbanBoard initialColumns={columns} availableTags={tags} />
+        <WorkspaceView initialColumns={columns} availableTags={tags} />
       </section>
     </main>
   )
