@@ -211,11 +211,51 @@ export function TaskDetailDrawer({
 
           {/* Due Date */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" /> Due Date
-              </span>
-            </label>
+  <div className="flex items-center justify-between mb-1.5">
+    <label className="text-xs font-medium text-zinc-400 flex items-center gap-1">
+      <Calendar className="w-3.5 h-3.5" /> Due Date
+    </label>
+    <div className="flex items-center gap-1 text-[10px]">
+      <button
+        type="button"
+        onClick={() => setDueDate(new Date().toISOString().split("T")[0])}
+        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+      >
+        Today
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const d = new Date()
+          d.setDate(d.getDate() + 1)
+          setDueDate(d.toISOString().split("T")[0])
+        }}
+        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+      >
+        Tomorrow
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const d = new Date()
+          d.setDate(d.getDate() + 7)
+          setDueDate(d.toISOString().split("T")[0])
+        }}
+        className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+      >
+        +1 Wk
+      </button>
+      {dueDate && (
+        <button
+          type="button"
+          onClick={() => setDueDate("")}
+          className="px-1.5 py-0.5 rounded bg-zinc-800/60 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 transition-colors"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  </div>
             <input
               type="date"
               value={dueDate}

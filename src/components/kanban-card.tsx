@@ -55,8 +55,7 @@ function formatDueDate(dueDateInput: string | Date | null | undefined) {
 
   return {
     text: formatted,
-    className: isOverdue
-      ? "text-red-400 bg-red-950/40 border-red-900/60"
+    className: isOverdue ? "text-red-400 bg-red-950/60 border-red-700 animate-pulse font-bold" : isSoon ? "text-amber-300 bg-amber-950/50 border-amber-600/80 font-medium"
       : isSoon
       ? "text-amber-400 bg-amber-950/40 border-amber-900/60"
       : "text-zinc-400 bg-zinc-800/80 border-zinc-700/60",
