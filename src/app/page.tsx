@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma"
 import { ColumnItem } from "@/components/kanban-board"
 import { WorkspaceView } from "@/components/workspace-view"
 import { CreateTaskDialog } from "@/components/create-task-dialog"
+import { ActivityItem } from "@/components/activity-log-drawer"
 
 export default async function Home() {
-  const [project, tags] = await Promise.all([
+  const [project, tags, activities] = await Promise.all([
     prisma.project.findFirst({
       include: {
         columns: {
@@ -25,6 +26,10 @@ export default async function Home() {
     }),
     prisma.tag.findMany({
       orderBy: { name: "asc" },
+    }),
+    prisma.activityLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 40,
     }),
   ])
 
@@ -47,7 +52,11 @@ export default async function Home() {
       </header>
 
       <section>
-        <WorkspaceView initialColumns={columns} availableTags={tags} />
+        <WorkspaceView
+          initialColumns={columns}
+          availableTags={tags}
+          activities={activities as unknown as ActivityItem[]}
+        />
       </section>
     </main>
   )
