@@ -1,35 +1,55 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
-import { LayoutGrid, List } from "lucide-react"
+import React, { useState, useMemo, useEffect, useCallback } from "react"
+import { LayoutGrid, List, Command } from "lucide-react"
 import { KanbanBoard, ColumnItem } from "./kanban-board"
 import { TaskListView } from "./task-list-view"
 import { TaskDetailDrawer } from "./task-detail-drawer"
 import { TaskItem, TagItem } from "./kanban-card"
 import { WorkspaceFilterBar, FilterState } from "./workspace-filter-bar"
+import { CommandPalette } from "./command-palette"
 
 export function WorkspaceView({
   initialColumns,
   availableTags = [],
+  onOpenCreateTask,
 }: {
   initialColumns: ColumnItem[]
   availableTags?: TagItem[]
+  onOpenCreateTask?: () => void
 }) {
   const [view, setView] = useState<"board" | "list">("board")
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     priorities: [],
     tagIds: [],
   })
 
-  // Filter columns and their nested tasks reactively
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setIsPaletteOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
+  // Flatten tasks for palette search
+  const allTasks = useMemo(() => {
+    return initialColumns.flatMap((col) => col.tasks)
+  }, [initialColumns])
+
+  // Filter columns and nested tasks reactively
   const filteredColumns = useMemo(() => {
     const query = filters.search.trim().toLowerCase()
 
     return initialColumns.map((col) => {
       const filteredTasks = col.tasks.filter((task) => {
-        // 1. Search Query (Title, Description, HERUPU-ID)
         if (query) {
           const matchTitle = task.title.toLowerCase().includes(query)
           const matchDesc = task.description?.toLowerCase().includes(query)
@@ -37,12 +57,10 @@ export function WorkspaceView({
           if (!matchTitle && !matchDesc && !matchId) return false
         }
 
-        // 2. Priority Filter
         if (filters.priorities.length > 0) {
           if (!filters.priorities.includes(task.priority)) return false
         }
 
-        // 3. Tag Filter
         if (filters.tagIds.length > 0) {
           const taskTagIds = task.tags?.map((t) => t.id) || []
           const hasMatchingTag = filters.tagIds.some((id) => taskTagIds.includes(id))
@@ -61,7 +79,7 @@ export function WorkspaceView({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Top Bar: View Switcher & Live Filter Toolbar */}
+      {/* Top Bar: View Switcher & Palette Trigger */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800 w-fit">
           <button
@@ -88,6 +106,17 @@ export function WorkspaceView({
             <span>List</span>
           </button>
         </div>
+
+        <button
+          onClick={() => setIsPaletteOpen(true)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+        >
+          <Command className="w-3.5 h-3.5" />
+          <span>Quick Actions</span>
+          <kbd className="ml-1 text-[10px] font-mono bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-400">
+            Ctrl+K
+          </kbd>
+        </button>
       </div>
 
       <WorkspaceFilterBar
@@ -96,7 +125,7 @@ export function WorkspaceView({
         availableTags={availableTags}
       />
 
-      {/* Render Selected View with Filtered Data */}
+      {/* Render Selected View */}
       {view === "board" ? (
         <KanbanBoard
           initialColumns={filteredColumns}
@@ -109,15 +138,26 @@ export function WorkspaceView({
         />
       )}
 
-      {/* Slide-over Drawer for List View */}
-      {view === "list" && (
-        <TaskDetailDrawer
-          task={selectedTask}
-          columns={initialColumns.map((c) => ({ id: c.id, name: c.name }))}
-          availableTags={availableTags}
-          onClose={() => setSelectedTask(null)}
-        />
-      )}
+      {/* Slide-over Drawer for List View & Palette jumps */}
+      <TaskDetailDrawer
+        task={selectedTask}
+        columns={initialColumns.map((c) => ({ id: c.id, name: c.name }))}
+        availableTags={availableTags}
+        onClose={() => setSelectedTask(null)}
+      />
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        tasks={allTasks}
+        onSelectTask={(task) => setSelectedTask(task)}
+        onSwitchView={(v) => setView(v)}
+        onOpenCreateTask={() => {
+          const btn = document.getElementById("header-create-task-btn")
+          btn?.click()
+        }}
+      />
     </div>
   )
 }
