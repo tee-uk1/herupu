@@ -67,6 +67,10 @@ export function KanbanBoard({ initialColumns }: { initialColumns: ColumnItem[] }
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setColumns(initialColumns)
+  }, [initialColumns])
+
+  useEffect(() => {
     setMounted(true)
   }, [])
 
@@ -129,7 +133,6 @@ export function KanbanBoard({ initialColumns }: { initialColumns: ColumnItem[] }
         const [taskToMove] = sourceTasks.splice(activeIndex, 1)
         const updatedTask = { ...taskToMove, columnId: targetCol.id }
 
-        // If hovering directly over the column container (e.g. empty column)
         const isOverColumn = tgt.id === overId
         if (isOverColumn) {
           targetTasks.push(updatedTask)
@@ -202,12 +205,7 @@ export function KanbanBoard({ initialColumns }: { initialColumns: ColumnItem[] }
             </div>
             <div className="flex flex-col gap-2 min-h-[160px] p-1">
               {col.tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="bg-zinc-800/60 border border-zinc-700/60 rounded-md p-3"
-                >
-                  <span className="text-sm font-medium text-zinc-100">{task.title}</span>
-                </div>
+                <KanbanCard key={task.id} task={task} />
               ))}
             </div>
           </div>

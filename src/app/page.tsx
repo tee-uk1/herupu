@@ -1,21 +1,30 @@
 import { prisma } from "@/lib/prisma"
 import { KanbanBoard, ColumnItem } from "@/components/kanban-board"
+import { CreateTaskDialog } from "@/components/create-task-dialog"
 
 export default async function Home() {
-  const project = await prisma.project.findFirst({
-    include: {
-      columns: {
-        orderBy: { order: "asc" },
-        include: {
-          tasks: {
-            orderBy: { order: "asc" },
+  const [project, tags] = await Promise.all([
+    prisma.project.findFirst({
+      include: {
+        columns: {
+          orderBy: { order: "asc" },
+          include: {
+            tasks: {
+              orderBy: { order: "asc" },
+              include: {
+                tags: true,
+              },
+            },
           },
         },
       },
-    },
-  })
+    }),
+    prisma.tag.findMany({
+      orderBy: { name: "asc" },
+    }),
+  ])
 
-  const columns: ColumnItem[] = project?.columns ?? []
+  const columns: ColumnItem[] = (project?.columns as unknown as ColumnItem[]) ?? []
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 p-8 flex flex-col gap-6">
@@ -26,6 +35,11 @@ export default async function Home() {
             Project: {project?.name ?? "No Project Found"}
           </p>
         </div>
+
+        <CreateTaskDialog
+          columns={columns.map((c) => ({ id: c.id, name: c.name }))}
+          availableTags={tags}
+        />
       </header>
 
       <section>

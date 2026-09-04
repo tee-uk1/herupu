@@ -3,79 +3,68 @@ import { PrismaClient, Priority } from "@prisma/client"
 const prisma = new PrismaClient()
 
 async function main() {
+  await prisma.tag.deleteMany()
   await prisma.task.deleteMany()
   await prisma.column.deleteMany()
   await prisma.project.deleteMany()
-  await prisma.workspace.deleteMany()
 
-  const workspace = await prisma.workspace.create({
+  const project = await prisma.project.create({
     data: {
-      name: "T's Workspace",
-      projects: {
-        create: {
-          name: "Sprint 1",
-          columns: {
-            create: [
-              {
-                name: "To Do",
-                order: 0,
-                tasks: {
-                  create: [
-                    {
-                      title: "Design card UI with Base UI",
-                      description: "Use compact cards with tags, avatars, and priority flags.",
-                      priority: Priority.HIGH,
-                      order: 0,
-                    },
-                    {
-                      title: "Add drag-and-drop mechanics",
-                      description: "Integrate @dnd-kit to move cards across lanes.",
-                      priority: Priority.URGENT,
-                      order: 1,
-                    },
-                  ],
-                },
-              },
-              {
-                name: "In Progress",
-                order: 1,
-                tasks: {
-                  create: [
-                    {
-                      title: "Configure Docker & Postgres",
-                      description: "Set up Prisma schema and initial container setup.",
-                      priority: Priority.MEDIUM,
-                      order: 0,
-                    },
-                  ],
-                },
-              },
-              {
-                name: "Review",
-                order: 2,
-              },
-              {
-                name: "Done",
-                order: 3,
-                tasks: {
-                  create: [
-                    {
-                      title: "Initialize Next.js project",
-                      description: "Set up Next.js App Router with Tailwind CSS.",
-                      priority: Priority.LOW,
-                      order: 0,
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      },
+      name: "Herupu Launch Sprint",
     },
   })
 
-  console.log(`Database seeded with workspace: ${workspace.name}`)
+  // Seed standard tags
+  const tagFrontend = await prisma.tag.create({ data: { name: "Frontend", color: "#3b82f6" } })
+  const tagBackend = await prisma.tag.create({ data: { name: "Backend", color: "#10b981" } })
+  const tagBug = await prisma.tag.create({ data: { name: "Bug", color: "#ef4444" } })
+
+  const columnsData = [
+    { name: "To Do", order: 0 },
+    { name: "In Progress", order: 1 },
+    { name: "Review", order: 2 },
+    { name: "Done", order: 3 },
+  ]
+
+  const createdColumns = []
+  for (const col of columnsData) {
+    const c = await prisma.column.create({
+      data: {
+        name: col.name,
+        order: col.order,
+        projectId: project.id,
+      },
+    })
+    createdColumns.push(c)
+  }
+
+  // To Do tasks
+  await prisma.task.create({
+    data: {
+      title: "Design ClickUp task drawer",
+      description: "Allow full screen or drawer editing for descriptions and custom metadata.",
+      priority: Priority.HIGH,
+      dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+      order: 0,
+      columnId: createdColumns[0].id,
+      tags: { connect: [{ id: tagFrontend.id }] },
+    },
+  })
+
+  // In Progress tasks
+  await prisma.task.create({
+    data: {
+      title: "Set up PostgreSQL relation mapping",
+      description: "Support many-to-many relationship between tags and tasks.",
+      priority: Priority.URGENT,
+      dueDate: new Date(Date.now() - 12 * 60 * 60 * 1000), // Overdue
+      order: 0,
+      columnId: createdColumns[1].id,
+      tags: { connect: [{ id: tagBackend.id }, { id: tagBug.id }] },
+    },
+  })
+
+  console.log("Database seeded successfully with tags and due dates.")
 }
 
 main()
