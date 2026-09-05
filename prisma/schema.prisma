@@ -35,6 +35,7 @@ model Board {
   columns     Column[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  documents   Document[]
 }
 
 model Column {
@@ -57,6 +58,7 @@ model Task {
   columnId         String
   column           Column       @relation(fields: [columnId], references: [id], onDelete: Cascade)
   dueDate          DateTime?
+  startDate        DateTime?
   isArchived       Boolean      @default(false)
   isPinnedToMaster Boolean      @default(false)
   
@@ -126,6 +128,8 @@ model Document {
   workspaceId String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   
+  boardId     String?
+  board       Board?     @relation(fields: [boardId], references: [id], onDelete: Cascade)
   taskId      String?
   task        Task?      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   
@@ -135,3 +139,5 @@ model Document {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+

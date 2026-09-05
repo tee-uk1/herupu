@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect,  useState  } from "react"
 import {
   X,
   Calendar,
@@ -34,13 +34,13 @@ import { useSession } from "next-auth/react"
 
 export function TaskDetailDrawer({
   task,
-  columns,
+  columns = [],
   availableTags,
   availableUsers = [],
   onClose,
 }: {
   task: TaskItem | null
-  columns: { id: string; name: string }[]
+  columns?: { id: string; name: string }[]
   availableTags: TagItem[]
   availableUsers?: UserItem[]
   onClose: () => void
@@ -54,6 +54,16 @@ export function TaskDetailDrawer({
   const [driveUrl, setDriveUrl] = useState("")
   const [driveName, setDriveName] = useState("")
   const [isAttaching, setIsAttaching] = useState(false)
+
+    useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [onClose])
 
   if (!task) return null
 
@@ -125,7 +135,7 @@ export function TaskDetailDrawer({
                 onChange={(e) => updateTaskDetails(task.id, { columnId: e.target.value })}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-zinc-200 outline-none"
               >
-                {columns.map((c) => (
+                {columns?.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>

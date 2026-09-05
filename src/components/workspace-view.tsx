@@ -75,8 +75,8 @@ export function WorkspaceView({
   const allColumnsForSelect = initialColumns.map((c) => ({ id: c.id, name: c.name }))
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div className="flex flex-col h-full w-full min-h-0 min-w-0 overflow-hidden p-4 gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <WorkspaceFilterBar
           filters={filters}
           onChange={setFilters}
@@ -138,19 +138,13 @@ export function WorkspaceView({
         </div>
       </div>
 
-      {view === "board" ? (
-        <KanbanBoard initialColumns={filteredColumns} onTaskClick={setSelectedTask} />
-      ) : (
+      {view === "board" ? (<div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+        <KanbanBoard onTaskClick={(task: any) => { setSelectedTask(task); }} onTaskClick={(task: any) => { setSelectedTask(task); }} initialColumns={filteredColumns} onTaskClick={setSelectedTask} />
+      </div>) : (
         <ListView initialColumns={filteredColumns} onTaskClick={setSelectedTask} />
       )}
 
-      <TaskDetailDrawer
-        task={selectedTask}
-        columns={allColumnsForSelect}
-        availableTags={availableTags}
-        availableUsers={availableUsers}
-        onClose={() => setSelectedTask(null)}
-      />
+      
 
       <ActivityLogDrawer
         isOpen={isActivityOpen}

@@ -31,210 +31,230 @@ import {
   deleteColumn,
 } from "@/app/actions"
 
-export type ColumnItem = {
+export interface ColumnData {
   id: string
   name: string
   order: number
   tasks: TaskItem[]
 }
 
-function WorkflowColumn({
+interface KanbanBoardProps {
+  initialColumns: ColumnData[]
+  boardId?: string
+  availableTags: TagItem[]
+  availableUsers?: Array<{ id: string; name: string | null; email: string | null; image: string | null }>
+  currentUserRole?: string
+}
+
+function getColumnPillTheme(name: string) {
+  const n = name.toUpperCase()
+  if (n.includes("HOW TO")) return { pill: "bg-sky-500/10 text-sky-300 border-sky-500/30", dot: "bg-sky-400" }
+  if (n.includes("REQUESTS")) return { pill: "bg-rose-500/10 text-rose-300 border-rose-500/30", dot: "bg-rose-400" }
+  if (n.includes("APPROVED")) return { pill: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30", dot: "bg-indigo-400" }
+  if (n.includes("DOING")) return { pill: "bg-orange-500/10 text-orange-300 border-orange-500/30", dot: "bg-orange-400" }
+  if (n.includes("REVIEW")) return { pill: "bg-amber-500/10 text-amber-300 border-amber-500/30", dot: "bg-amber-400" }
+  if (n.includes("DONE")) return { pill: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" }
+  if (n.includes("STOP")) return { pill: "bg-rose-500/10 text-rose-300 border-rose-500/30", dot: "bg-rose-400" }
+  if (n.includes("START")) return { pill: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" }
+  if (n.includes("CONTINUE")) return { pill: "bg-sky-500/10 text-sky-300 border-sky-500/30", dot: "bg-sky-400" }
+  if (n.includes("KAIZEN")) return { pill: "bg-purple-500/10 text-purple-300 border-purple-500/30", dot: "bg-purple-400" }
+  return { pill: "bg-zinc-800 text-zinc-300 border-zinc-700/50", dot: "bg-zinc-400" }
+}
+
+function DroppableColumn({
   column,
-  isAdmin = false,
-  children,
+  onTaskClick,
+  onAddTask,
+  onUpdateColumnName,
+  onDeleteColumn,
+  currentUserRole = "MEMBER",
 }: {
-  column: ColumnItem
-  isAdmin?: boolean
-  children: React.ReactNode
+  column: ColumnData
+  onTaskClick: (task: TaskItem) => void
+  onAddTask: (columnId: string, title: string) => Promise<void>
+  onUpdateColumnName: (columnId: string, newName: string) => Promise<void>
+  onDeleteColumn: (columnId: string) => Promise<void>
+  currentUserRole?: string
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
+    data: { type: "column", column },
   })
 
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState(column.name)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [columnName, setColumnName] = useState(column.name)
+  const [showOptions, setShowOptions] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showInlineCreator, setShowInlineCreator] = useState(false)
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  const isAdmin = currentUserRole === "ADMIN"
+  const theme = getColumnPillTheme(column.name)
 
   const handleSaveName = async () => {
-    const trimmed = name.trim()
-    if (!trimmed || trimmed === column.name) {
-      setName(column.name)
+    if (!columnName.trim() || columnName === column.name) {
       setIsEditing(false)
+      setColumnName(column.name)
       return
     }
-    await updateColumnName(column.id, trimmed)
+    await onUpdateColumnName(column.id, columnName.trim())
     setIsEditing(false)
   }
 
   const handleDelete = async () => {
-    const msg =
-      column.tasks.length > 0
-        ? `Deleting "${column.name}" will also delete its ${column.tasks.length} task(s). Continue?`
-        : `Delete column "${column.name}"?`
-    if (confirm(msg)) {
-      await deleteColumn(column.id)
+    if (confirm(`Delete column "${column.name}" and all its tasks?`)) {
+      setIsDeleting(true)
+      await onDeleteColumn(column.id)
     }
   }
 
   return (
     <div
       ref={setNodeRef}
-      className={`w-72 shrink-0 bg-zinc-900/70 border rounded-lg p-3 flex flex-col justify-between transition-colors ${
-        isOver ? "border-blue-500/50 bg-zinc-900" : "border-zinc-800/80"
+      className={`flex flex-col w-80 shrink-0 h-full rounded-2xl bg-[#0e1017]/70 border transition-all duration-150 ${
+        isOver
+          ? "border-indigo-500/50 bg-[#12141f] shadow-lg shadow-indigo-500/5"
+          : "border-white/[0.05]"
       }`}
     >
-      <div className="flex flex-col gap-3">
-        {/* Column Stage Header */}
-        <div className="flex items-center justify-between px-1 relative">
-          {isAdmin && isEditing ? (
-            <div className="flex items-center gap-1.5 flex-1 mr-2">
+      {/* Column Header */}
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-white/[0.04]">
+        <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+          {isEditing && isAdmin ? (
+            <div className="flex items-center gap-1 flex-1">
               <input
                 type="text"
-                value={name}
-                autoFocus
-                onChange={(e) => setName(e.target.value)}
+                value={columnName}
+                onChange={(e) => setColumnName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSaveName()
                   if (e.key === "Escape") {
-                    setName(column.name)
                     setIsEditing(false)
+                    setColumnName(column.name)
                   }
                 }}
-                className="bg-zinc-950 border border-zinc-700 text-xs px-2 py-1 rounded text-zinc-100 outline-none w-full"
+                autoFocus
+                className="w-full bg-[#161822] text-xs px-2 py-0.5 rounded border border-indigo-500/40 text-zinc-100 focus:outline-none"
               />
-              <button
-                onClick={handleSaveName}
-                className="p-1 hover:text-emerald-400 text-zinc-400"
-              >
+              <button onClick={handleSaveName} className="p-1 hover:bg-white/[0.08] rounded text-emerald-400">
                 <Check className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => {
-                  setName(column.name)
-                  setIsEditing(false)
-                }}
-                className="p-1 hover:text-zinc-200 text-zinc-500"
-              >
+              <button onClick={() => { setIsEditing(false); setColumnName(column.name) }} className="p-1 hover:bg-white/[0.08] rounded text-zinc-400">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <div
-              onClick={() => {
-                if (isAdmin) setIsEditing(true)
-              }}
-              className={`flex items-center gap-2 flex-1 mr-2 overflow-hidden ${
-                isAdmin ? "cursor-pointer group" : "cursor-default"
-              }`}
-            >
-              <span
-                className={`text-xs font-semibold tracking-wider uppercase truncate ${
-                  isAdmin ? "group-hover:text-blue-400 transition-colors text-zinc-200" : "text-zinc-300"
-                }`}
-              >
-                {column.name}
+            <div className="flex items-center gap-2 truncate">
+              <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide border flex items-center gap-1.5 shrink-0 ${theme.pill}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${theme.dot}`} />
+                <span className="truncate">{column.name}</span>
               </span>
-              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono shrink-0">
+              <span className="text-[11px] font-mono text-zinc-500 shrink-0">
                 {column.tasks.length}
               </span>
             </div>
           )}
+        </div>
 
-          {/* Admin Action Menu */}
+        <div className="flex items-center gap-1 relative shrink-0">
+          <button
+            onClick={() => setShowInlineCreator(true)}
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors"
+            title="Add Task"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+
           {isAdmin && (
-            <div className="relative" ref={menuRef}>
+            <>
               <button
-                onClick={() => setMenuOpen((prev) => !prev)}
-                className="p-1 text-zinc-500 hover:text-zinc-300 rounded hover:bg-zinc-800 transition-colors"
-                title="Manage Stage (Admin)"
+                onClick={() => setShowOptions(!showOptions)}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors"
               >
-                <MoreHorizontal className="w-4 h-4" />
+                <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
 
-              {menuOpen && (
-                <div className="absolute right-0 top-6 w-32 bg-zinc-900 border border-zinc-800 rounded-md shadow-xl py-1 z-30 text-xs flex flex-col">
+              {showOptions && (
+                <div className="absolute right-0 top-7 w-32 bg-[#141620] border border-white/[0.08] rounded-xl shadow-xl py-1 z-30">
                   <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setIsEditing(true)
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 text-left"
+                    onClick={() => { setIsEditing(true); setShowOptions(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/[0.06] hover:text-white"
                   >
-                    <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                    <Edit2 className="w-3.5 h-3.5" />
                     Rename
                   </button>
                   <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      handleDelete()
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-red-400 hover:bg-red-950/30 text-left"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Delete
                   </button>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
-
-        {children}
       </div>
 
-      <InlineTaskCreator columnId={column.id} />
+      {/* Task List Canvas */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2.5">
+        {showInlineCreator && (
+          <InlineTaskCreator
+            columnId={column.id}
+            onCancel={() => setShowInlineCreator(false)}
+            onTaskCreated={async (title) => {
+              await onAddTask(column.id, title)
+              setShowInlineCreator(false)
+            }}
+          />
+        )}
+
+        <SortableContext
+          items={column.tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {column.tasks.map((task) => (
+            <KanbanCard key={task.id} task={task} onTaskClick={onTaskClick} />
+          ))}
+        </SortableContext>
+
+        {column.tasks.length === 0 && !showInlineCreator && (
+          <div className="h-20 flex items-center justify-center border border-dashed border-white/[0.04] rounded-xl text-[11px] text-zinc-600">
+            No tasks
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 export function KanbanBoard({
   initialColumns,
-  availableTags = [],
-  isAdmin = false,
-}: {
-  initialColumns: ColumnItem[]
-  availableTags?: TagItem[]
-  isAdmin?: boolean
-}) {
-  const [columns, setColumns] = useState<ColumnItem[]>(initialColumns)
-  const [activeTask, setActiveTask] = useState<TaskItem | null>(null)
-  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
+  boardId,
+  availableTags,
+  availableUsers = [],
+  currentUserRole = "MEMBER",
+}: KanbanBoardProps) {
+  const [columns, setColumns] = useState<ColumnData[]>(initialColumns)
   const [mounted, setMounted] = useState(false)
 
-  // Admin Add Column State
-  const [isAddingCol, setIsAddingCol] = useState(false)
-  const [newColName, setNewColName] = useState("")
-  const [isSubmittingCol, setIsSubmittingCol] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const [activeTask, setActiveTask] = useState<TaskItem | null>(null)
+  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [newColumnName, setNewColumnName] = useState("")
+  const [isCreatingColumn, setIsCreatingColumn] = useState(false)
+  const isAdmin = currentUserRole === "ADMIN"
 
   useEffect(() => {
     setColumns(initialColumns)
-    if (selectedTask) {
-      const refreshed = initialColumns
-        .flatMap((c) => c.tasks)
-        .find((t) => t.id === selectedTask.id)
-      if (refreshed) setSelectedTask(refreshed)
-    }
   }, [initialColumns])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 4,
+        distance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -242,246 +262,255 @@ export function KanbanBoard({
     })
   )
 
-  const findColumn = useCallback(
-    (id: string) => {
-      return (
-        columns.find((col) => col.id === id) ||
-        columns.find((col) => col.tasks.some((t) => t.id === id))
-      )
+  const findColumnOfTask = useCallback(
+    (taskId: string): ColumnData | undefined => {
+      return columns.find((c) => c.tasks.some((t) => t.id === taskId))
     },
     [columns]
   )
 
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
-      const { active } = event
-      const activeId = String(active.id)
-      const col = findColumn(activeId)
-      const task = col?.tasks.find((t) => t.id === activeId)
-      setActiveTask(task ?? null)
-    },
-    [findColumn]
-  )
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
+    const activeData = active.data.current
 
-  const handleDragOver = useCallback(
-    (event: DragOverEvent) => {
-      const { active, over } = event
-      if (!over) return
-
-      const activeId = String(active.id)
-      const overId = String(over.id)
-
-      const sourceCol = findColumn(activeId)
-      const targetCol = findColumn(overId)
-
-      if (!sourceCol || !targetCol || sourceCol.id === targetCol.id) return
-
-      setColumns((prev) => {
-        const src = prev.find((c) => c.id === sourceCol.id)
-        const tgt = prev.find((c) => c.id === targetCol.id)
-        if (!src || !tgt) return prev
-
-        const sourceTasks = [...src.tasks]
-        const targetTasks = [...tgt.tasks]
-
-        const activeIndex = sourceTasks.findIndex((t) => t.id === activeId)
-        if (activeIndex === -1) return prev
-
-        const [taskToMove] = sourceTasks.splice(activeIndex, 1)
-        const updatedTask = { ...taskToMove, columnId: targetCol.id }
-
-        const isOverColumn = tgt.id === overId
-        if (isOverColumn) {
-          targetTasks.push(updatedTask)
-        } else {
-          const overIndex = targetTasks.findIndex((t) => t.id === overId)
-          if (overIndex >= 0) {
-            targetTasks.splice(overIndex, 0, updatedTask)
-          } else {
-            targetTasks.push(updatedTask)
-          }
-        }
-
-        return prev.map((col) => {
-          if (col.id === sourceCol.id) return { ...col, tasks: sourceTasks }
-          if (col.id === targetCol.id) return { ...col, tasks: targetTasks }
-          return col
-        })
-      })
-    },
-    [findColumn]
-  )
-
-  const handleDragEnd = useCallback(
-    async (event: DragEndEvent) => {
-      const { active, over } = event
-      setActiveTask(null)
-
-      if (!over) return
-
-      const activeId = String(active.id)
-      const overId = String(over.id)
-
-      const currentColumn = findColumn(activeId)
-      if (!currentColumn) return
-
-      const oldIndex = currentColumn.tasks.findIndex((t) => t.id === activeId)
-      const newIndex = currentColumn.tasks.findIndex((t) => t.id === overId)
-
-      let finalTasks = currentColumn.tasks
-      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        finalTasks = arrayMove(currentColumn.tasks, oldIndex, newIndex)
-        setColumns((prev) =>
-          prev.map((col) =>
-            col.id === currentColumn.id ? { ...col, tasks: finalTasks } : col
-          )
-        )
-      }
-
-      const taskIndex = finalTasks.findIndex((t) => t.id === activeId)
-      if (taskIndex !== -1) {
-        await updateTaskPosition(activeId, currentColumn.id, taskIndex)
-      }
-    },
-    [findColumn]
-  )
-
-  const handleCreateColumn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const trimmed = newColName.trim()
-    if (!trimmed || isSubmittingCol) return
-
-    setIsSubmittingCol(true)
-    await createColumn(trimmed)
-    setNewColName("")
-    setIsSubmittingCol(false)
-    setIsAddingCol(false)
+    if (activeData?.type === "task") {
+      setActiveTask(activeData.task)
+    }
   }
 
-  if (!mounted) {
-    return (
-      <div className="flex gap-4 overflow-x-auto pb-6 items-start">
-        {initialColumns.map((col) => (
-          <div
-            key={col.id}
-            className="w-72 shrink-0 bg-zinc-900/70 border border-zinc-800/80 rounded-lg p-3 flex flex-col justify-between"
-          >
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-                {col.name}
-              </span>
-              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full font-mono">
-                {col.tasks.length}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+
+    const fromCol = findColumnOfTask(activeId)
+    let toCol = findColumnOfTask(overId)
+
+    if (!toCol) {
+      toCol = columns.find((c) => c.id === overId)
+    }
+
+    if (!fromCol || !toCol || fromCol.id === toCol.id) return
+
+    setColumns((prevCols) => {
+      const movingTask = fromCol.tasks.find((t) => t.id === activeId)
+      if (!movingTask) return prevCols
+
+      return prevCols.map((col) => {
+        if (col.id === fromCol.id) {
+          return { ...col, tasks: col.tasks.filter((t) => t.id !== activeId) }
+        }
+        if (col.id === toCol.id) {
+          const overIdx = col.tasks.findIndex((t) => t.id === overId)
+          const insertIdx = overIdx >= 0 ? overIdx : col.tasks.length
+          const updated = [...col.tasks]
+          updated.splice(insertIdx, 0, { ...movingTask, columnId: toCol.id })
+          return { ...col, tasks: updated }
+        }
+        return col
+      })
+    })
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveTask(null)
+
+    if (!over) return
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+
+    const targetCol =
+      findColumnOfTask(activeId) ||
+      columns.find((c) => c.id === overId) ||
+      findColumnOfTask(overId)
+
+    if (!targetCol) return
+
+    const oldIndex = targetCol.tasks.findIndex((t) => t.id === activeId)
+    let newIndex = targetCol.tasks.findIndex((t) => t.id === overId)
+
+    if (newIndex === -1) {
+      newIndex = targetCol.tasks.length - 1
+    }
+
+    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+      setColumns((prev) =>
+        prev.map((c) => {
+          if (c.id === targetCol.id) {
+            return { ...c, tasks: arrayMove(c.tasks, oldIndex, newIndex) }
+          }
+          return c
+        })
+      )
+    }
+
+    const finalCol = findColumnOfTask(activeId)
+    if (finalCol) {
+      const finalIndex = finalCol.tasks.findIndex((t) => t.id === activeId)
+      await updateTaskPosition(activeId, finalCol.id, Math.max(0, finalIndex))
+    }
+  }
+
+  const handleAddTask = async (columnId: string, title: string) => {
+    const tempId = `temp-${Date.now()}`
+    const targetCol = columns.find((c) => c.id === columnId)
+    const newTask: TaskItem = {
+      id: tempId,
+      title,
+      description: null,
+      priority: "MEDIUM",
+      order: targetCol ? targetCol.tasks.length : 0,
+      dueDate: null,
+      isArchived: false,
+      isPinnedToMaster: false,
+      columnId,
+      assignedToId: null,
+      assignedTo: null,
+      tags: [],
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId ? { ...col, tasks: [...col.tasks, newTask] } : col
+      )
     )
+
+    const created = await updateTaskPosition(tempId, columnId, newTask.order, title)
+    if (created && created.id) {
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === columnId
+            ? { ...col, tasks: col.tasks.map((t) => (t.id === tempId ? { ...t, id: created.id } : t)) }
+            : col
+        )
+      )
+    }
+  }
+
+  const handleCreateColumn = async () => {
+    if (!newColumnName.trim() || !boardId) return
+    setIsCreatingColumn(true)
+    try {
+      const created = await createColumn(boardId, newColumnName.trim(), columns.length)
+      if (created) {
+        setColumns((prev) => [...prev, { ...created, tasks: [] }])
+      }
+      setNewColumnName("")
+    } finally {
+      setIsCreatingColumn(false)
+    }
+  }
+
+  const handleUpdateColumnName = async (columnId: string, newName: string) => {
+    setColumns((prev) =>
+      prev.map((col) => (col.id === columnId ? { ...col, name: newName } : col))
+    )
+    await updateColumnName(columnId, newName)
+  }
+
+  const handleDeleteColumn = async (columnId: string) => {
+    setColumns((prev) => prev.filter((col) => col.id !== columnId))
+    await deleteColumn(columnId)
   }
 
   return (
-    <>
-      <DndContext
-        id="kanban-board-dnd"
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-4 overflow-x-auto pb-6 items-start">
-          {columns.map((column) => {
-            const taskIds = column.tasks.map((t) => t.id)
+    <div className="flex flex-col h-full w-full min-h-0 min-w-0 overflow-hidden bg-[#08090d]">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6" suppressHydrationWarning>
+        <DndContext id="herupu-kanban-dnd"
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="inline-flex items-start gap-4 h-full min-h-full pb-4">
+            {columns.map((column) => (
+              <DroppableColumn
+                key={column.id}
+                column={column}
+                onTaskClick={(task) => {
+                  setSelectedTask(task)
+                  setIsDrawerOpen(true)
+                }}
+                onAddTask={handleAddTask}
+                onUpdateColumnName={handleUpdateColumnName}
+                onDeleteColumn={handleDeleteColumn}
+                currentUserRole={currentUserRole}
+              />
+            ))}
 
-            return (
-              <WorkflowColumn key={column.id} column={column} isAdmin={isAdmin}>
-                <SortableContext
-                  id={column.id}
-                  items={taskIds}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="flex flex-col gap-2 min-h-[160px] rounded-md p-1">
-                    {column.tasks.map((task) => (
-                      <KanbanCard
-                        key={task.id}
-                        task={task}
-                        onTaskClick={(t) => setSelectedTask(t)}
-                      />
-                    ))}
-                    {column.tasks.length === 0 && (
-                      <div className="h-24 flex items-center justify-center border border-dashed border-zinc-800/80 rounded text-xs text-zinc-500 select-none">
-                        Drop here
-                      </div>
-                    )}
-                  </div>
-                </SortableContext>
-              </WorkflowColumn>
-            )
-          })}
-
-          {/* Admin-only Add Column Button */}
-          {isAdmin && (
-            <div className="w-72 shrink-0">
-              {isAddingCol ? (
-                <form
-                  onSubmit={handleCreateColumn}
-                  className="bg-zinc-900/90 border border-zinc-800 p-3 rounded-lg flex flex-col gap-2 shadow-lg"
-                >
+            {/* Admin Add Column Capsule */}
+            {isAdmin && boardId && (
+              <div className="w-72 shrink-0 p-3 rounded-2xl bg-[#0e1017]/40 border border-dashed border-white/[0.06]">
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    autoFocus
-                    disabled={isSubmittingCol}
-                    value={newColName}
-                    onChange={(e) => setNewColName(e.target.value)}
-                    placeholder="New stage name..."
-                    className="w-full bg-zinc-950 border border-zinc-700 text-xs px-2.5 py-1.5 rounded text-zinc-100 outline-none focus:border-blue-500"
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateColumn()}
+                    placeholder="+ Add Column..."
+                    className="flex-1 bg-[#141620] text-xs px-3 py-1.5 rounded-lg border border-white/[0.06] text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50"
                   />
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="submit"
-                      disabled={!newColName.trim() || isSubmittingCol}
-                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
-                    >
-                      {isSubmittingCol && <Loader2 className="w-3 h-3 animate-spin" />}
-                      Add Stage
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingCol(false)
-                        setNewColName("")
-                      }}
-                      className="p-1 text-zinc-400 hover:text-zinc-200"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setIsAddingCol(true)}
-                  className="w-full h-11 flex items-center justify-center gap-1.5 border border-dashed border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Stage</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+                  <button
+                    onClick={handleCreateColumn}
+                    disabled={isCreatingColumn || !newColumnName.trim()}
+                    className="p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-all"
+                  >
+                    {isCreatingColumn ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
-        <DragOverlay>
-          {activeTask ? <KanbanCard task={activeTask} isOverlay /> : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeTask ? (
+              <div className="w-76 rotate-2 shadow-2xl opacity-95">
+                <KanbanCard task={activeTask} isOverlay />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
 
+      {/* Task Inspection & Edit Drawer */}
       <TaskDetailDrawer
         task={selectedTask}
-        columns={columns.map((c) => ({ id: c.id, name: c.name }))}
+        columns={columns.map(c => ({ id: c.id, name: c.name }))}
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          setIsDrawerOpen(false)
+          setSelectedTask(null)
+        }}
+        onTaskUpdated={(updatedTask) => {
+          setColumns((prev) =>
+            prev.map((col) => ({
+              ...col,
+              tasks: col.tasks.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask } : t)),
+            }))
+          )
+        }}
+        onTaskDeleted={(deletedTaskId) => {
+          setColumns((prev) =>
+            prev.map((col) => ({
+              ...col,
+              tasks: col.tasks.filter((t) => t.id !== deletedTaskId),
+            }))
+          )
+        }}
         availableTags={availableTags}
-        onClose={() => setSelectedTask(null)}
+        availableUsers={availableUsers}
+        currentUserRole={currentUserRole}
       />
-    </>
+    </div>
   )
 }

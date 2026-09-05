@@ -1,7 +1,7 @@
-import { PrismaClient } from "@prisma/client"
-import bcrypt from "bcryptjs"
+const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 const STANDARD_COLUMNS = [
   { name: "HOW TO", order: 0 },
@@ -10,7 +10,7 @@ const STANDARD_COLUMNS = [
   { name: "DOING", order: 3 },
   { name: "REVIEW", order: 4 },
   { name: "DONE", order: 5 },
-]
+];
 
 const WORKING_GROUPS = [
   "Main Board",
@@ -24,24 +24,24 @@ const WORKING_GROUPS = [
   "Outreach/Social Media",
   "Volunteer Coordination",
   "Wednesday Meetings",
-]
+];
 
 async function main() {
-  console.log("Cleaning existing database records...")
-  await prisma.activityLog.deleteMany({})
-  await prisma.taskAttachment.deleteMany({})
-  await prisma.comment.deleteMany({})
-  await prisma.subtask.deleteMany({})
-  await prisma.task.deleteMany({})
-  await prisma.column.deleteMany({})
-  await prisma.document.deleteMany({})
-  await prisma.board.deleteMany({})
-  await prisma.workspace.deleteMany({})
+  console.log("Cleaning database...");
+  await prisma.activityLog.deleteMany({});
+  await prisma.taskAttachment.deleteMany({});
+  await prisma.comment.deleteMany({});
+  await prisma.subtask.deleteMany({});
+  await prisma.task.deleteMany({});
+  await prisma.column.deleteMany({});
+  await prisma.document.deleteMany({});
+  await prisma.board.deleteMany({});
+  await prisma.workspace.deleteMany({});
 
-  console.log("Creating default Admin user if needed...")
-  let admin = await prisma.user.findFirst({ where: { role: "ADMIN" } })
+  console.log("Creating Admin user...");
+  let admin = await prisma.user.findFirst({ where: { role: "ADMIN" } });
   if (!admin) {
-    const hashedPassword = await bcrypt.hash("admin123", 10)
+    const hashedPassword = await bcrypt.hash("admin123", 10);
     admin = await prisma.user.create({
       data: {
         name: "Admin User",
@@ -49,37 +49,27 @@ async function main() {
         password: hashedPassword,
         role: "ADMIN",
       },
-    })
+    });
   }
 
-  console.log("Creating 'The Job Hackers' Workspace...")
+  console.log("Creating 'The Job Hackers' Workspace...");
   const workspace = await prisma.workspace.create({
-    data: {
-      name: "The Job Hackers",
-    },
-  })
+    data: { name: "The Job Hackers" },
+  });
 
-  // 1. Create Working Group Boards with standard columns
   for (let i = 0; i < WORKING_GROUPS.length; i++) {
-    const name = WORKING_GROUPS[i]
-    const isMaster = name === "Main Board"
-
+    const name = WORKING_GROUPS[i];
     const board = await prisma.board.create({
       data: {
         name,
-        isMaster,
+        isMaster: name === "Main Board",
         workspaceId: workspace.id,
-        columns: {
-          create: STANDARD_COLUMNS,
-        },
+        columns: { create: STANDARD_COLUMNS },
       },
-      include: {
-        columns: true,
-      },
-    })
+      include: { columns: true },
+    });
 
-    // Add standard Job Hackers template cards to HOW TO column
-    const howToCol = board.columns.find((c) => c.name === "HOW TO")
+    const howToCol = board.columns.find((c) => c.name === "HOW TO");
     if (howToCol) {
       await prisma.task.create({
         data: {
@@ -88,7 +78,7 @@ async function main() {
           priority: "MEDIUM",
           columnId: howToCol.id,
         },
-      })
+      });
 
       await prisma.task.create({
         data: {
@@ -97,10 +87,9 @@ async function main() {
           priority: "URGENT",
           columnId: howToCol.id,
         },
-      })
+      });
     }
 
-    // Add a default guide document to the board
     await prisma.document.create({
       data: {
         title: `${name} — Working Agreement & Notes`,
@@ -108,10 +97,9 @@ async function main() {
         boardId: board.id,
         workspaceId: workspace.id,
       },
-    })
+    });
   }
 
-  // 2. Create the dedicated Retro Board
   await prisma.board.create({
     data: {
       name: "Retro Board",
@@ -126,9 +114,8 @@ async function main() {
         ],
       },
     },
-  })
+  });
 
-  // 3. Create the Off-Board Parking Lot & Rejected Board
   await prisma.board.create({
     data: {
       name: "Off-Board Lists",
@@ -141,16 +128,16 @@ async function main() {
         ],
       },
     },
-  })
+  });
 
-  console.log("Database successfully seeded with The Job Hackers workflow!")
+  console.log("Database successfully seeded with The Job Hackers workflow!");
 }
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error(e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });

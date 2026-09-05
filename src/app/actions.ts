@@ -453,9 +453,10 @@ export async function addSubtask(taskId: string, title: string) {
 
 
 // Native Document Helpers
-export async function createDocument(title: string, options?: { taskId?: string, workspaceId?: string }) {
+export async function createDocument(title: string, options?: { taskId?: string; workspaceId?: string; boardId?: string }) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
+  if (session.user.role !== "ADMIN") throw new Error("Forbidden: Only admins can create documents")
 
   const doc = await prisma.document.create({
     data: {
@@ -464,6 +465,7 @@ export async function createDocument(title: string, options?: { taskId?: string,
       authorName: session.user.name || session.user.email || "Unknown",
       taskId: options?.taskId,
       workspaceId: options?.workspaceId,
+      boardId: options?.boardId,
     },
   })
   
@@ -490,4 +492,41 @@ export async function deleteDocument(id: string) {
 
   await prisma.document.delete({ where: { id } })
   revalidatePath("/")
+}
+
+
+
+
+export async function toggleTaskMasterPin(taskId: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) throw new Error("Task not found")
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      isPinnedToMaster: !task.isPinnedToMaster,
+    },
+    include: {
+      tags: true,
+      assignedTo: true,
+      subtasks: true,
+      comments: true,
+      attachments: true,
+    },
+  })
+
+  await prisma.activityLog.create({
+    data: {
+      action: updated.isPinnedToMaster ? "ELEVATED_TO_MAIN" : "REMOVED_FROM_MAIN",
+      details: `Task "${updated.title}" was ${updated.isPinnedToMaster ? "elevated to Main Board" : "removed from Main Board"}`,
+      userId: session.user.id,
+      taskId: updated.id,
+    },
+  })
+
+  revalidatePath("/")
+  return updated
 }
